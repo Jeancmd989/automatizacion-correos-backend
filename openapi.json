@@ -1,0 +1,1788 @@
+{
+  "components": {
+    "schemas": {
+      "BuzonSalida": {
+        "properties": {
+          "correo_de_la_cuenta": {
+            "title": "Correo De La Cuenta",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "expira_en": {
+            "format": "date-time",
+            "title": "Expira En",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "proveedor": {
+            "title": "Proveedor",
+            "type": "string"
+          },
+          "verificada_en": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verificada En"
+          }
+        },
+        "required": [
+          "id",
+          "proveedor",
+          "correo_de_la_cuenta",
+          "estado",
+          "expira_en",
+          "verificada_en"
+        ],
+        "title": "BuzonSalida",
+        "type": "object"
+      },
+      "CallbackEntrada": {
+        "additionalProperties": false,
+        "properties": {
+          "codigo": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Codigo",
+            "type": "string"
+          },
+          "state": {
+            "maxLength": 256,
+            "minLength": 16,
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo",
+          "state"
+        ],
+        "title": "CallbackEntrada",
+        "type": "object"
+      },
+      "ContadoresSalida": {
+        "properties": {
+          "adjuntos_descargados": {
+            "default": 0,
+            "title": "Adjuntos Descargados",
+            "type": "integer"
+          },
+          "adjuntos_duplicados": {
+            "default": 0,
+            "title": "Adjuntos Duplicados",
+            "type": "integer"
+          },
+          "adjuntos_rechazados": {
+            "default": 0,
+            "title": "Adjuntos Rechazados",
+            "type": "integer"
+          },
+          "errores": {
+            "default": 0,
+            "title": "Errores",
+            "type": "integer"
+          },
+          "mensajes_con_adjuntos": {
+            "default": 0,
+            "title": "Mensajes Con Adjuntos",
+            "type": "integer"
+          },
+          "mensajes_revisados": {
+            "default": 0,
+            "title": "Mensajes Revisados",
+            "type": "integer"
+          }
+        },
+        "title": "ContadoresSalida",
+        "type": "object"
+      },
+      "EntradaDeAuditoriaSalida": {
+        "properties": {
+          "accion": {
+            "title": "Accion",
+            "type": "string"
+          },
+          "actor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "ocurrido_en": {
+            "format": "date-time",
+            "title": "Ocurrido En",
+            "type": "string"
+          },
+          "recurso_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurso Id"
+          },
+          "tipo_de_recurso": {
+            "title": "Tipo De Recurso",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "accion",
+          "tipo_de_recurso",
+          "recurso_id",
+          "actor_id",
+          "ocurrido_en"
+        ],
+        "title": "EntradaDeAuditoriaSalida",
+        "type": "object"
+      },
+      "ErrorDeProcesamientoSalida": {
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "etapa": {
+            "title": "Etapa",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "mensaje": {
+            "title": "Mensaje",
+            "type": "string"
+          },
+          "ocurrido_en": {
+            "format": "date-time",
+            "title": "Ocurrido En",
+            "type": "string"
+          },
+          "reintentable": {
+            "title": "Reintentable",
+            "type": "boolean"
+          },
+          "trabajo_id": {
+            "format": "uuid",
+            "title": "Trabajo Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "trabajo_id",
+          "etapa",
+          "codigo",
+          "mensaje",
+          "reintentable",
+          "ocurrido_en"
+        ],
+        "title": "ErrorDeProcesamientoSalida",
+        "type": "object"
+      },
+      "EscaneoSalida": {
+        "properties": {
+          "codigo_de_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo De Error"
+          },
+          "contadores": {
+            "$ref": "#/components/schemas/ContadoresSalida"
+          },
+          "encolado_en": {
+            "format": "date-time",
+            "title": "Encolado En",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fase": {
+            "title": "Fase",
+            "type": "string"
+          },
+          "finalizado_en": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finalizado En"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "iniciado_en": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iniciado En"
+          },
+          "mensaje_de_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mensaje De Error"
+          },
+          "progreso_porcentaje": {
+            "title": "Progreso Porcentaje",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "estado",
+          "fase",
+          "progreso_porcentaje",
+          "contadores",
+          "codigo_de_error",
+          "mensaje_de_error",
+          "encolado_en",
+          "iniciado_en",
+          "finalizado_en"
+        ],
+        "title": "EscaneoSalida",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "IniciarEscaneoEntrada": {
+        "additionalProperties": false,
+        "properties": {
+          "carpeta": {
+            "default": "INBOX",
+            "maxLength": 120,
+            "pattern": "^[\\w\\-/ ]+$",
+            "title": "Carpeta",
+            "type": "string"
+          },
+          "conexion_id": {
+            "format": "uuid",
+            "title": "Conexion Id",
+            "type": "string"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta"
+          },
+          "limite_de_mensajes": {
+            "default": 100,
+            "maximum": 50000.0,
+            "minimum": 1.0,
+            "title": "Limite De Mensajes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "conexion_id"
+        ],
+        "title": "IniciarEscaneoEntrada",
+        "type": "object"
+      },
+      "IniciarVinculacionEntrada": {
+        "additionalProperties": false,
+        "properties": {
+          "proveedor": {
+            "pattern": "^(google|microsoft)$",
+            "title": "Proveedor",
+            "type": "string"
+          },
+          "redirect_uri": {
+            "maxLength": 512,
+            "minLength": 8,
+            "title": "Redirect Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "proveedor",
+          "redirect_uri"
+        ],
+        "title": "IniciarVinculacionEntrada",
+        "type": "object"
+      },
+      "PerfilSalida": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "permisos": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Permisos",
+            "type": "array"
+          },
+          "rol": {
+            "title": "Rol",
+            "type": "string"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "tenant_id",
+          "email",
+          "rol",
+          "permisos"
+        ],
+        "title": "PerfilSalida",
+        "type": "object"
+      },
+      "Respuesta_BuzonSalida_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BuzonSalida"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "status": {
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Respuesta[BuzonSalida]",
+        "type": "object"
+      },
+      "Respuesta_EscaneoSalida_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/EscaneoSalida"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "status": {
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Respuesta[EscaneoSalida]",
+        "type": "object"
+      },
+      "Respuesta_PerfilSalida_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PerfilSalida"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "status": {
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Respuesta[PerfilSalida]",
+        "type": "object"
+      },
+      "Respuesta_SaludSalida_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SaludSalida"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "status": {
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Respuesta[SaludSalida]",
+        "type": "object"
+      },
+      "Respuesta_UrlDeAutorizacionSalida_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UrlDeAutorizacionSalida"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "status": {
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Respuesta[UrlDeAutorizacionSalida]",
+        "type": "object"
+      },
+      "Respuesta_list_BuzonSalida__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/BuzonSalida"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "status": {
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Respuesta[list[BuzonSalida]]",
+        "type": "object"
+      },
+      "Respuesta_list_EntradaDeAuditoriaSalida__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/EntradaDeAuditoriaSalida"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "status": {
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Respuesta[list[EntradaDeAuditoriaSalida]]",
+        "type": "object"
+      },
+      "Respuesta_list_ErrorDeProcesamientoSalida__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorDeProcesamientoSalida"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "status": {
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Respuesta[list[ErrorDeProcesamientoSalida]]",
+        "type": "object"
+      },
+      "Respuesta_list_EscaneoSalida__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/EscaneoSalida"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "status": {
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Respuesta[list[EscaneoSalida]]",
+        "type": "object"
+      },
+      "SaludSalida": {
+        "properties": {
+          "componentes": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "boolean"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Componentes"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          }
+        },
+        "required": [
+          "estado"
+        ],
+        "title": "SaludSalida",
+        "type": "object"
+      },
+      "UrlDeAutorizacionSalida": {
+        "properties": {
+          "url_de_autorizacion": {
+            "title": "Url De Autorizacion",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url_de_autorizacion"
+        ],
+        "title": "UrlDeAutorizacionSalida",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Ingesta de adjuntos de correo y extraccion de datos tributarios. Todas las rutas requieren un token OIDC salvo las sondas de salud.",
+    "title": "Automatizacion de Correos API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/audit": {
+      "get": {
+        "description": "Bitacora del tenant. Requiere rol administrativo.",
+        "operationId": "auditoria_api_v1_audit_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limite",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limite",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_list_EntradaDeAuditoriaSalida__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Auditoria",
+        "tags": [
+          "perfil"
+        ]
+      }
+    },
+    "/api/v1/mailboxes": {
+      "get": {
+        "operationId": "listar_api_v1_mailboxes_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_list_BuzonSalida__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Listar",
+        "tags": [
+          "buzones"
+        ]
+      }
+    },
+    "/api/v1/mailboxes/authorize": {
+      "post": {
+        "description": "Devuelve la URL de consentimiento. El `state` y el PKCE quedan en Redis.",
+        "operationId": "autorizar_api_v1_mailboxes_authorize_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IniciarVinculacionEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_UrlDeAutorizacionSalida_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Autorizar",
+        "tags": [
+          "buzones"
+        ]
+      }
+    },
+    "/api/v1/mailboxes/callback": {
+      "post": {
+        "description": "Completa la vinculacion canjeando el codigo por tokens.",
+        "operationId": "callback_api_v1_mailboxes_callback_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallbackEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_BuzonSalida_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Callback",
+        "tags": [
+          "buzones"
+        ]
+      }
+    },
+    "/api/v1/mailboxes/{conexion_id}": {
+      "delete": {
+        "description": "Revoca el consentimiento en el proveedor y elimina la conexion.",
+        "operationId": "desvincular_api_v1_mailboxes__conexion_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conexion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conexion Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Desvincular",
+        "tags": [
+          "buzones"
+        ]
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "operationId": "perfil_api_v1_me_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_PerfilSalida_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Perfil",
+        "tags": [
+          "perfil"
+        ]
+      }
+    },
+    "/api/v1/scans": {
+      "get": {
+        "operationId": "listar_api_v1_scans_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limite",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limite",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_list_EscaneoSalida__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Listar",
+        "tags": [
+          "escaneos"
+        ]
+      },
+      "post": {
+        "description": "Encola un escaneo. Idempotente si se envia `Idempotency-Key`.",
+        "operationId": "iniciar_api_v1_scans_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IniciarEscaneoEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_EscaneoSalida_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Iniciar",
+        "tags": [
+          "escaneos"
+        ]
+      }
+    },
+    "/api/v1/scans/{trabajo_id}": {
+      "get": {
+        "operationId": "obtener_api_v1_scans__trabajo_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trabajo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Trabajo Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_EscaneoSalida_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Obtener",
+        "tags": [
+          "escaneos"
+        ]
+      }
+    },
+    "/api/v1/scans/{trabajo_id}/cancel": {
+      "post": {
+        "operationId": "cancelar_api_v1_scans__trabajo_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trabajo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Trabajo Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_EscaneoSalida_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancelar",
+        "tags": [
+          "escaneos"
+        ]
+      }
+    },
+    "/api/v1/scans/{trabajo_id}/errors": {
+      "get": {
+        "operationId": "errores_del_escaneo_api_v1_scans__trabajo_id__errors_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trabajo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Trabajo Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limite",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limite",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_list_ErrorDeProcesamientoSalida__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Errores Del Escaneo",
+        "tags": [
+          "escaneos"
+        ]
+      }
+    },
+    "/api/v1/scans/{trabajo_id}/stream": {
+      "get": {
+        "description": "Progreso en vivo por Server-Sent Events.\n\nLa autorizacion se comprueba ANTES de abrir el stream: una vez\nestablecido, la conexion queda abierta y ya no hay donde devolver un\n403 que el cliente interprete correctamente.",
+        "operationId": "transmitir_progreso_api_v1_scans__trabajo_id__stream_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trabajo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Trabajo Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Transmitir Progreso",
+        "tags": [
+          "escaneos"
+        ]
+      }
+    },
+    "/health/live": {
+      "get": {
+        "description": "Responde si el proceso esta en pie. Sin dependencias externas.",
+        "operationId": "vivo_health_live_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_SaludSalida_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Vivo",
+        "tags": [
+          "salud"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "description": "Comprueba base de datos, Redis y almacenamiento, en paralelo.",
+        "operationId": "preparado_health_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_SaludSalida_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Preparado",
+        "tags": [
+          "salud"
+        ]
+      }
+    }
+  }
+}
