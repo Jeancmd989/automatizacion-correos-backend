@@ -24,7 +24,7 @@ from mailauto.bootstrap.settings import Settings
 from mailauto.shared.errors import TokenInvalido
 
 
-def _ajustes(**extra: Any) -> Settings:
+def _ajustes(**extra: Any) -> Settings:  # noqa: ANN401 - campos de configuracion heterogeneos
     """
     Configuracion valida construida por el constructor, no por
     `model_copy`: este ultimo salta la validacion y dejaria `environment`
@@ -48,7 +48,7 @@ def _ajustes(**extra: Any) -> Settings:
     return Settings(**{**base, **extra})
 
 
-def _ajustes_de_produccion(**extra: Any) -> Settings:
+def _ajustes_de_produccion(**extra: Any) -> Settings:  # noqa: ANN401 - campos de configuracion heterogeneos
     propios: dict[str, Any] = {
         "environment": "production",
         "kms_provider": "aws",

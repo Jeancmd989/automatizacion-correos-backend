@@ -71,7 +71,7 @@ class AlmacenDeObjetosS3(AlmacenDeObjetos):
         )
         self._endpoint = endpoint_url
 
-    def _cliente(self) -> Any:
+    def _cliente(self) -> Any:  # noqa: ANN401 - context manager de aioboto3, sin tipos publicos
         return self._sesion.client("s3", endpoint_url=self._endpoint, config=_CONFIG)
 
     async def guardar(
@@ -89,6 +89,16 @@ class AlmacenDeObjetosS3(AlmacenDeObjetos):
                 )
         except (ClientError, BotoCoreError) as exc:
             logger.error("fallo_al_guardar_objeto", clave=clave, error=type(exc).__name__)
+            raise ErrorDeAlmacenamiento() from exc
+
+    async def descargar(self, clave: str) -> bytes:
+        try:
+            async with self._cliente() as s3:
+                respuesta = await s3.get_object(Bucket=self._bucket, Key=clave)
+                cuerpo: bytes = await respuesta["Body"].read()
+                return cuerpo
+        except (ClientError, BotoCoreError) as exc:
+            logger.error("fallo_al_descargar_objeto", clave=clave, error=type(exc).__name__)
             raise ErrorDeAlmacenamiento() from exc
 
     async def url_de_descarga(self, clave: str, *, ttl_segundos: int) -> str:
@@ -116,7 +126,7 @@ class AlmacenDeObjetosS3(AlmacenDeObjetos):
             async with self._cliente() as s3:
                 await s3.head_bucket(Bucket=self._bucket)
             return True
-        except Exception:
+        except Exception:  # noqa: BLE001 - sonda de salud: informa binario, no diagnostica
             return False
 
     async def asegurar_bucket(self) -> None:

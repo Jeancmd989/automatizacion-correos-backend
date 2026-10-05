@@ -27,9 +27,13 @@ from mailauto.bootstrap.settings import get_settings
 
 # Importaciones con efecto de registro en Base.metadata. No eliminar.
 from mailauto.modules.audit.infrastructure import repository as _audit  # noqa: F401
+from mailauto.modules.extraction.infrastructure.persistence import (  # noqa: F401
+    models as _extraction,
+)
 from mailauto.modules.identity.infrastructure import models as _identity  # noqa: F401
 from mailauto.modules.ingestion.infrastructure import models as _ingestion  # noqa: F401
 from mailauto.modules.mailbox.infrastructure import models as _mailbox  # noqa: F401
+from mailauto.modules.reporting.infrastructure import models as _reporting  # noqa: F401
 from mailauto.shared.db.base import Base
 
 config = context.config

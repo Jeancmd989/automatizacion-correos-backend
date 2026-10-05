@@ -75,7 +75,7 @@ def _es_sensible(clave: str) -> bool:
     return any(sensible in clave_normalizada for sensible in CLAVES_SENSIBLES)
 
 
-def _redactar(valor: Any, profundidad: int = 0) -> Any:
+def _redactar(valor: Any, profundidad: int = 0) -> Any:  # noqa: ANN401 - recorre cualquier estructura de evento
     if profundidad >= _PROFUNDIDAD_MAXIMA:
         return _MASCARA
     if isinstance(valor, dict):
@@ -89,7 +89,7 @@ def _redactar(valor: Any, profundidad: int = 0) -> Any:
 
 
 def procesador_de_redaccion(
-    _logger: Any,
+    _logger: Any,  # noqa: ANN401 - firma impuesta por structlog
     _nombre: str,
     evento: MutableMapping[str, Any],
 ) -> MutableMapping[str, Any]:
@@ -99,7 +99,7 @@ def procesador_de_redaccion(
 
 
 def procesador_de_traza(
-    _logger: Any,
+    _logger: Any,  # noqa: ANN401 - firma impuesta por structlog
     _nombre: str,
     evento: MutableMapping[str, Any],
 ) -> MutableMapping[str, Any]:

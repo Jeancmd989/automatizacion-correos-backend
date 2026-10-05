@@ -144,7 +144,7 @@ class FabricaDeSesiones:
             async with self._engine.connect() as conexion:
                 await conexion.execute(text("SELECT 1"))
             return True
-        except Exception:
+        except Exception:  # noqa: BLE001 - sonda de salud: informa binario, no diagnostica
             return False
 
 

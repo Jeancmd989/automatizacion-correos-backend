@@ -83,7 +83,7 @@ class BuzonSalida(BaseModel):
     verificada_en: datetime | None
 
     @classmethod
-    def desde_dominio(cls, conexion: Any) -> BuzonSalida:
+    def desde_dominio(cls, conexion: Any) -> BuzonSalida:  # noqa: ANN401 - entidad de dominio: tiparla acoplaria la API al modulo
         # No se exponen ni los tokens ni los alcances concedidos: lo
         # primero es la credencial y lo segundo revela la configuracion
         # OAuth de la aplicacion.
@@ -132,7 +132,7 @@ class EscaneoSalida(BaseModel):
     finalizado_en: datetime | None
 
     @classmethod
-    def desde_dominio(cls, trabajo: Any) -> EscaneoSalida:
+    def desde_dominio(cls, trabajo: Any) -> EscaneoSalida:  # noqa: ANN401 - entidad de dominio: tiparla acoplaria la API al modulo
         return cls(
             id=trabajo.id,
             estado=trabajo.estado.value,
@@ -144,6 +144,109 @@ class EscaneoSalida(BaseModel):
             encolado_en=trabajo.encolado_en,
             iniciado_en=trabajo.iniciado_en,
             finalizado_en=trabajo.finalizado_en,
+        )
+
+
+# ── Registros extraidos ──────────────────────────────────────────────
+
+
+class RegistroSalida(BaseModel):
+    id: UUID
+    adjunto_id: UUID
+    trabajo_id: UUID
+    perfil: str
+    ruc_contribuyente: str | None
+    nombre_contribuyente: str
+    ruc_inquilino: str | None
+    nombre_inquilino: str
+    periodo: str | None
+    fecha_de_pago: str | None
+    numero_de_operacion: str | None
+    importe: str | None
+    moneda: str | None
+    completitud: str
+    estado_de_revision: str
+    # Lo que la interfaz resalta al revisar: sin esto, quien corrige
+    # tiene que comparar el documento campo por campo.
+    campos_dudosos: list[str]
+    confianza_por_campo: dict[str, float]
+    estrategia_usada: str | None
+    creado_en: datetime
+
+    @classmethod
+    def desde_dominio(cls, registro: Any) -> RegistroSalida:  # noqa: ANN401
+        # `campos_crudos` no se expone: contiene el texto tal cual lo
+        # leyo el motor, que puede arrastrar fragmentos del documento
+        # ajenos a los campos.
+        return cls(
+            id=registro.id,
+            adjunto_id=registro.adjunto_id,
+            trabajo_id=registro.trabajo_id,
+            perfil=registro.perfil,
+            ruc_contribuyente=str(registro.ruc_contribuyente)
+            if registro.ruc_contribuyente
+            else None,
+            nombre_contribuyente=registro.nombre_contribuyente,
+            ruc_inquilino=str(registro.ruc_inquilino) if registro.ruc_inquilino else None,
+            nombre_inquilino=registro.nombre_inquilino,
+            periodo=str(registro.periodo) if registro.periodo else None,
+            fecha_de_pago=str(registro.fecha_de_pago) if registro.fecha_de_pago else None,
+            numero_de_operacion=str(registro.numero_de_operacion)
+            if registro.numero_de_operacion
+            else None,
+            importe=str(registro.importe) if registro.importe else None,
+            moneda=registro.importe.moneda if registro.importe else None,
+            completitud=registro.completitud.value,
+            estado_de_revision=registro.estado_de_revision.value,
+            campos_dudosos=registro.campos_dudosos(),
+            confianza_por_campo=registro.confianza_por_campo,
+            estrategia_usada=registro.estrategia_usada.value if registro.estrategia_usada else None,
+            creado_en=registro.creado_en,
+        )
+
+
+class CorreccionEntrada(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # Diccionario campo -> valor en texto. El caso de uso lo interpreta
+    # con los objetos de valor y rechaza lo que no sea corregible.
+    correcciones: Annotated[dict[str, str], Field(min_length=1, max_length=12)]
+
+
+# ── Reportes ─────────────────────────────────────────────────────────
+
+
+class SolicitarExportacionEntrada(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    formato: Annotated[str, Field(pattern="^(xlsx|csv)$")] = "xlsx"
+    ruc: Annotated[str | None, Field(default=None, pattern=r"^\d{11}$")] = None
+    periodo: Annotated[str | None, Field(default=None, pattern=r"^\d{6}$")] = None
+
+
+class ExportacionSalida(BaseModel):
+    id: UUID
+    formato: str
+    estado: str
+    total_filas: int
+    mensaje_de_error: str | None
+    # Presente solo cuando el reporte esta listo. Vida corta: lleva los
+    # datos tributarios del cliente.
+    url_de_descarga: str | None
+    creado_en: datetime
+    finalizado_en: datetime | None
+
+    @classmethod
+    def desde_dominio(cls, exportacion: Any, url: str | None) -> ExportacionSalida:  # noqa: ANN401
+        return cls(
+            id=exportacion.id,
+            formato=exportacion.formato.value,
+            estado=exportacion.estado.value,
+            total_filas=exportacion.total_filas,
+            mensaje_de_error=exportacion.mensaje_de_error,
+            url_de_descarga=url,
+            creado_en=exportacion.creado_en,
+            finalizado_en=exportacion.finalizado_en,
         )
 
 
@@ -160,7 +263,7 @@ class ErrorDeProcesamientoSalida(BaseModel):
     ocurrido_en: datetime
 
     @classmethod
-    def desde_dominio(cls, error: Any) -> ErrorDeProcesamientoSalida:
+    def desde_dominio(cls, error: Any) -> ErrorDeProcesamientoSalida:  # noqa: ANN401 - entidad de dominio: tiparla acoplaria la API al modulo
         # `contexto` queda fuera: puede contener nombres de archivo y
         # otros datos del correo del usuario.
         return cls(
@@ -183,7 +286,7 @@ class EntradaDeAuditoriaSalida(BaseModel):
     ocurrido_en: datetime
 
     @classmethod
-    def desde_dominio(cls, entrada: Any) -> EntradaDeAuditoriaSalida:
+    def desde_dominio(cls, entrada: Any) -> EntradaDeAuditoriaSalida:  # noqa: ANN401 - entidad de dominio: tiparla acoplaria la API al modulo
         return cls(
             id=entrada.id,
             accion=entrada.accion.value,

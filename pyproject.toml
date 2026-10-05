@@ -32,6 +32,20 @@ dependencies = [
     # que arrastra tiene CVE-2026-97687. Se fija aqui para que el
     # resolutor no pueda elegir una anterior.
     "urllib3>=2.8.0",
+    # Extraccion de documentos
+    # Las tres estrategias de lectura, de la mas barata a la mas cara.
+    # Solo se instalan en la imagen del worker: la API no abre ficheros.
+    "pymupdf==1.28.2",
+    "pdfplumber==0.11.10",
+    "pytesseract==0.3.13",
+    # Variante headless: la imagen del worker no tiene servidor grafico,
+    # y la completa arrastra GTK y medio escritorio sin usarlo.
+    "opencv-python-headless==5.0.0.93",
+    "pillow==12.3.0",
+    # Vision IA: ultimo recurso del pipeline de extraccion
+    "anthropic==1.11.0",
+    # Reportes
+    "openpyxl==3.1.5",
     # Observabilidad
     "structlog==26.1.0",
     "opentelemetry-api==1.45.0",
@@ -94,6 +108,15 @@ select = [
     "RUF",       # reglas propias de ruff
     "S",         # bandit
     "ASYNC",     # errores de async
+    # `except Exception` sin justificar. El sistema tiene varias
+    # fronteras donde atraparlo todo es correcto (un worker, un motor
+    # de lectura, el borde HTTP); esta regla obliga a que cada una
+    # lleve su `noqa` con el motivo escrito, en vez de que se cuelen
+    # capturas ciegas por descuido.
+    "BLE",
+    # `Any` en una anotacion. Se usa en los adaptadores que tocan
+    # OpenCV o SDKs sin tipos; la regla exige justificarlo caso a caso.
+    "ANN401",
 ]
 ignore = [
     "S101",      # assert: legitimo en tests
@@ -141,6 +164,16 @@ packages = ["mailauto"]
 [[tool.mypy.overrides]]
 module = ["aioboto3.*", "botocore.*", "arq.*", "testcontainers.*"]
 ignore_missing_imports = true
+
+# Librerias de documento e IA sin tipos publicos o con tipos
+# incompletos. Se aislan aqui para que su falta de anotaciones no
+# obligue a relajar el modo estricto en el resto del proyecto: los
+# adaptadores que las usan si estan tipados en su frontera.
+[[tool.mypy.overrides]]
+module = ["pymupdf.*", "fitz.*", "pdfplumber.*", "pytesseract.*", "cv2.*", "openpyxl.*", "anthropic.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
+disallow_untyped_calls = false
 
 # redis-py publica py.typed pero su tipado es parcial: `aclose()` figura
 # sin anotar y el cliente asincrono no es generico. Saltar su analisis

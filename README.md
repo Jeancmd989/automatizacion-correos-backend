@@ -10,7 +10,7 @@ almacenamiento **S3/MinIO** y arquitectura hexagonal **verificada en CI**.
 
 ## Estado
 
-Implementadas las **fases 0 a 3** del [plan de arquitectura](ARQUITECTURA.md#17-plan-de-implementación-por-fases):
+Implementadas las **fases 0 a 5** del [plan de arquitectura](ARQUITECTURA.md#17-plan-de-implementación-por-fases):
 
 | Fase | Contenido | Estado |
 |------|-----------|--------|
@@ -18,13 +18,17 @@ Implementadas las **fases 0 a 3** del [plan de arquitectura](ARQUITECTURA.md#17-
 | 1 | Identidad, roles, RLS, auditoría | ✅ |
 | 2 | OAuth con PKCE, cifrado envolvente, refresco y revocación | ✅ |
 | 3 | Cola, worker de ingesta, validación de adjuntos, storage, SSE | ✅ |
-| 4 | Extracción multi-estrategia (PDF / OCR / visión IA) | pendiente |
-| 5 | Revisión humana y reportes Excel | pendiente |
-| 6–8 | Frontend, endurecimiento, operación | pendiente |
+| 4 | Extracción en cuatro motores, perfil SUNAT, confianza por campo | ✅ |
+| 5 | Cola de revisión humana, reportes Excel/CSV asíncronos | ✅ |
+| 6 | Frontend (interfaz de operación) | pendiente |
+| 7 | Endurecimiento, tests de integración, pruebas de carga | pendiente |
+| 8 | Operación: runbooks, dashboards, despliegue | pendiente |
 
-**Verificación actual:** 124 tests en verde, 6/6 contratos de arquitectura, `mypy --strict`
-sin hallazgos, `ruff` y `bandit` limpios. Los tests de integración con contenedores
-(fase 7) todavía no están escritos.
+**Verificación actual:** 336 tests en verde, 6/6 contratos de arquitectura, `mypy --strict`
+sin hallazgos, `ruff`, `bandit` y `pip-audit` limpios. Cobertura: dominio 92–100 %,
+capa de aplicación 73–100 %. Los adaptadores de entrada/salida (repositorios, OCR,
+proveedores HTTP) quedan sin cubrir hasta los tests de integración con contenedores
+de la fase 7.
 
 ---
 
@@ -124,7 +128,8 @@ Documento completo en [ARQUITECTURA.md](ARQUITECTURA.md). Resumen:
                              implementa los puertos
 ```
 
-- **domain** — entidades, objetos de valor y puertos. No importa SQLAlchemy, FastAPI ni httpx.
+- **domain** — entidades, objetos de valor y puertos. No importa SQLAlchemy, FastAPI, httpx
+  ni las librerías de parseo: los contratos de CI lo verifican.
 - **application** — casos de uso sobre puertos abstractos. Testeables sin red ni base de datos.
 - **infrastructure** — adaptadores concretos (PostgreSQL, Redis, S3, Gmail, Graph).
 - **api** — routers delgados que delegan.
@@ -132,13 +137,13 @@ Documento completo en [ARQUITECTURA.md](ARQUITECTURA.md). Resumen:
 
 Seis contextos acotados independientes: `identity`, `mailbox`, `ingestion`, `extraction`,
 `reporting`, `audit`. No se importan entre sí; la comunicación pasa por el composition root
-(ver `AdaptadorDeCredenciales` en `bootstrap/container.py`).
+(ver `bootstrap/adaptadores.py`).
 
 ```
 src/mailauto/
 ├── bootstrap/     configuración, contenedor de dependencias, fábrica de la app
 ├── shared/        cripto, seguridad, observabilidad, paginación, sesiones de BD
-├── modules/       identity · mailbox · ingestion · audit
+├── modules/       identity · mailbox · ingestion · extraction · reporting · audit
 ├── api/           routers v1, middlewares, DTOs
 └── workers/       definiciones de los workers ARQ
 ```
@@ -159,6 +164,24 @@ ajenos.
 > desactivado sin ningún error ni aviso. En desarrollo lo garantiza
 > [`scripts/init-db.sql`](scripts/init-db.sql); en producción debe reproducirlo la
 > infraestructura.
+
+**Extracción: coste controlado por diseño.** El pipeline prueba cuatro motores en orden de
+coste y para en cuanto los campos imprescindibles son fiables: texto nativo del PDF (~10 ms,
+gratis) → tablas → OCR local con preprocesamiento OpenCV (~800 ms, gratis) → visión IA
+(~2 s, de pago). La mayoría de documentos no pasa del primero. La IA lleva tope de llamadas
+por escaneo y, si no hay credencial, el pipeline degrada a los tres gratuitos en lugar de
+fallar.
+
+El documento es **entrada no confiable**: puede llevar texto escrito para que el modelo lo
+obedezca. Tres barreras — la imagen va en un bloque de usuario delimitado y nunca concatenada
+al prompt de sistema, el modelo no tiene herramientas, y la salida pasa después por los
+objetos de valor del dominio, que descartan un RUC sin dígito verificador válido venga de
+donde venga.
+
+**Dato tributario válido por construcción.** `Ruc("20131312954")` lanza: el dígito verificador
+módulo 11 se comprueba en el constructor. El OCR confunde 0/O, 1/l y 5/S, y sin esa
+comprobación esos errores entrarían en el reporte con apariencia de dato bueno. Lo mismo con
+periodos, importes (`Decimal`, nunca `float`) y fechas imposibles.
 
 **Credenciales OAuth.** Cifrado sobre envolvente: una DEK por cliente, envuelta por una
 clave maestra en KMS. AES-256-GCM con AAD = `tenant|propósito|sujeto`, de modo que un
@@ -198,6 +221,12 @@ cursor, nunca sin límite.
 | GET | `/api/v1/scans/{id}/stream` (SSE) | `scan:read` |
 | GET | `/api/v1/scans/{id}/errors` | `scan:read` |
 | POST | `/api/v1/scans/{id}/cancel` | `scan:run` |
+| GET | `/api/v1/records` · `/api/v1/records/{id}` | `record:read` |
+| PATCH | `/api/v1/records/{id}` (corregir y aprobar) | `record:review` |
+| POST | `/api/v1/records/{id}/approve` · `/reject` | `record:review` |
+| GET | `/api/v1/review` · `/api/v1/review/count` | `record:review` |
+| POST | `/api/v1/reports/exports` | `report:read` |
+| GET | `/api/v1/reports/exports/{id}` | `report:read` |
 | GET | `/api/v1/audit` | `admin:read` |
 
 Cabeceras: `Authorization: Bearer`, `X-Tenant-Id` (si el usuario pertenece a varios

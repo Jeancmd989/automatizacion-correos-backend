@@ -39,7 +39,7 @@ from mailauto.api.middleware.seguridad import (
     MiddlewareDeRateLimit,
     Siguiente,
 )
-from mailauto.api.v1.routers import buzones, escaneos, perfil, salud
+from mailauto.api.v1.routers import buzones, escaneos, perfil, registros, salud
 from mailauto.bootstrap.container import construir_contenedor
 from mailauto.bootstrap.settings import Settings, get_settings
 from mailauto.shared.observability.logging import configurar_logging, obtener_logger
@@ -140,6 +140,7 @@ def _montar_routers(app: FastAPI, ajustes: Settings) -> None:
     app.include_router(perfil.router, prefix=ajustes.api_prefix)
     app.include_router(buzones.router, prefix=ajustes.api_prefix)
     app.include_router(escaneos.router, prefix=ajustes.api_prefix)
+    app.include_router(registros.router, prefix=ajustes.api_prefix)
 
 
 class _RateLimitPerezoso(MiddlewareDeRateLimit):

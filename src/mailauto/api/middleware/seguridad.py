@@ -163,7 +163,7 @@ class MiddlewareDeRateLimit(BaseHTTPMiddleware):
             pipeline.incr(clave)
             pipeline.expire(clave, ventana)
             actual, _ = await pipeline.execute()
-        except Exception:
+        except Exception:  # noqa: BLE001 - el limitador degrada a pasante si Redis cae
             # Si Redis no responde se deja pasar. Es una decision
             # consciente: convertir una caida del limitador en una caida
             # total del servicio seria peor que admitir trafico sin limitar

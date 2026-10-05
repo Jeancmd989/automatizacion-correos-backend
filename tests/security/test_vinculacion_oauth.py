@@ -513,6 +513,18 @@ class ColaDeEscaneosFalsa(ColaDeTrabajos):
         self.encolados.append(trabajo_id)
         return "job"
 
+    async def encolar_extraccion(
+        self,
+        *,
+        tenant_id: UUID,
+        trabajo_id: UUID,
+        adjunto_id: UUID,
+        clave_de_almacenamiento: str,
+        tipo_mime: str,
+        nombre: str,
+    ) -> str:
+        return "extract"
+
     async def solicitar_cancelacion(self, trabajo_id: UUID) -> None:
         self.cancelados.append(trabajo_id)
 

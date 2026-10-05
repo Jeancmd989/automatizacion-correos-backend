@@ -28,8 +28,13 @@ down_revision = None
 branch_labels = None
 depends_on = None
 
-# Tablas de negocio: todas llevan tenant_id y todas reciben politica RLS.
-_TABLAS_CON_TENANT = (
+# Tablas de negocio que esta migracion protege con RLS.
+#
+# El nombre de esta constante es un contrato: el test
+# `tests/security/test_cobertura_de_rls.py` lo lee de cada migracion
+# para comprobar que ninguna tabla con `tenant_id` se quedo sin
+# politica. Si se renombra, hay que renombrarlo tambien alli.
+TABLAS_CON_RLS = (
     "encryption_keys",
     "mailbox_connections",
     "scan_jobs",
@@ -51,7 +56,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    for tabla in _TABLAS_CON_TENANT:
+    for tabla in TABLAS_CON_RLS:
         op.execute(f"DROP POLICY IF EXISTS tenant_isolation ON {tabla}")
     op.execute("DROP POLICY IF EXISTS audit_insert_only ON audit_log")
 
@@ -402,14 +407,14 @@ def _activar_rls() -> None:
     porque una consulta sin tenant declarado es un error de programacion
     y debe devolver vacio, no todo.
     """
-    for tabla in _TABLAS_CON_TENANT:
+    for tabla in TABLAS_CON_RLS:
         op.execute(f"ALTER TABLE {tabla} ENABLE ROW LEVEL SECURITY")
         op.execute(f"ALTER TABLE {tabla} FORCE ROW LEVEL SECURITY")
 
     # Politica general: lectura y escritura solo dentro del propio tenant.
     # `WITH CHECK` cubre INSERT y UPDATE: impide escribir una fila con el
     # tenant_id de otro, que seria la forma de inyectar datos ajenos.
-    for tabla in (t for t in _TABLAS_CON_TENANT if t != "audit_log"):
+    for tabla in (t for t in TABLAS_CON_RLS if t != "audit_log"):
         op.execute(
             f"""
             CREATE POLICY tenant_isolation ON {tabla}

@@ -40,6 +40,8 @@ from mailauto.shared.observability.logging import obtener_logger
 logger = obtener_logger(__name__)
 
 NOMBRE_DEL_JOB_DE_ESCANEO = "ejecutar_escaneo"
+NOMBRE_DEL_JOB_DE_EXTRACCION = "extraer_adjunto"
+NOMBRE_DEL_JOB_DE_EXPORTACION = "generar_exportacion"
 
 _PREFIJO_CANCELACION = "scan:cancel:"
 _PREFIJO_CANAL = "scan:progress:"
@@ -67,6 +69,40 @@ class ColaDeTrabajosRedis(ColaDeTrabajos):
             return f"scan:{trabajo_id}"
         return job.job_id
 
+    async def encolar_extraccion(
+        self,
+        *,
+        tenant_id: UUID,
+        trabajo_id: UUID,
+        adjunto_id: UUID,
+        clave_de_almacenamiento: str,
+        tipo_mime: str,
+        nombre: str,
+    ) -> str:
+        job = await self._arq.enqueue_job(
+            NOMBRE_DEL_JOB_DE_EXTRACCION,
+            str(tenant_id),
+            str(trabajo_id),
+            str(adjunto_id),
+            clave_de_almacenamiento,
+            tipo_mime,
+            nombre,
+            # El id deriva del adjunto: ARQ descarta un job cuyo id ya
+            # esta en la cola, asi que una doble publicacion no produce
+            # dos extracciones del mismo documento.
+            _job_id=f"extract:{adjunto_id}",
+        )
+        return job.job_id if job is not None else f"extract:{adjunto_id}"
+
+    async def encolar_exportacion(self, *, tenant_id: UUID, exportacion_id: UUID) -> str:
+        job = await self._arq.enqueue_job(
+            NOMBRE_DEL_JOB_DE_EXPORTACION,
+            str(tenant_id),
+            str(exportacion_id),
+            _job_id=f"export:{exportacion_id}",
+        )
+        return job.job_id if job is not None else f"export:{exportacion_id}"
+
     async def solicitar_cancelacion(self, trabajo_id: UUID) -> None:
         await self._redis.set(
             f"{_PREFIJO_CANCELACION}{trabajo_id}", "1", ex=_TTL_CANCELACION_SEGUNDOS
@@ -79,7 +115,7 @@ class ColaDeTrabajosRedis(ColaDeTrabajos):
         try:
             await self._redis.ping()
             return True
-        except Exception:
+        except Exception:  # noqa: BLE001 - el progreso es cosmetico; el estado real esta en la BD
             return False
 
 
@@ -92,7 +128,7 @@ class CanalDeProgresoRedis(CanalDeProgreso):
             await self._redis.publish(
                 f"{_PREFIJO_CANAL}{trabajo_id}", json.dumps(evento, default=str)
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 - sonda de salud: informa binario, no diagnostica
             # El progreso es cosmetico: que falle su publicacion no puede
             # tumbar un escaneo que por lo demas va bien. El estado real
             # queda en PostgreSQL.

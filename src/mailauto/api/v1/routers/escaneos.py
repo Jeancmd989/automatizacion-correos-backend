@@ -222,7 +222,7 @@ def _evento(nombre: str, datos: dict[str, Any]) -> str:
     return f"event: {nombre}\ndata: {json.dumps(datos, default=str)}\n\n"
 
 
-def _foto(trabajo: Any) -> dict[str, Any]:
+def _foto(trabajo: Any) -> dict[str, Any]:  # noqa: ANN401 - entidad de dominio: tiparla acoplaria la API al modulo
     return {
         "trabajo_id": str(trabajo.id),
         "estado": trabajo.estado.value,

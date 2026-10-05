@@ -65,6 +65,53 @@ async def ejecutar_escaneo(ctx: dict[str, Any], tenant_id: str, trabajo_id: str)
     )
 
 
+async def extraer_adjunto(
+    ctx: dict[str, Any],
+    tenant_id: str,
+    trabajo_id: str,
+    adjunto_id: str,
+    clave_de_almacenamiento: str,
+    tipo_mime: str,
+    nombre: str,
+) -> None:
+    """
+    Job de extraccion: un adjunto, un job.
+
+    Los argumentos van planos y como cadenas porque la carga del job
+    se serializa; pasar objetos ataria la cola a un formato concreto.
+    Llevar los metadatos en la carga, en vez de releerlos de la base
+    de datos, ahorra una consulta por adjunto y hace el job autonomo.
+    """
+    from uuid import UUID
+
+    from mailauto.modules.extraction.domain.ports import DocumentoAExtraer
+
+    contenedor: Contenedor = ctx["contenedor"]
+    tenant = UUID(tenant_id)
+
+    contenido = await contenedor.lector_de_adjuntos.leer(tenant, clave_de_almacenamiento)
+    await contenedor.extraer_documento.ejecutar(
+        DocumentoAExtraer(
+            adjunto_id=UUID(adjunto_id),
+            tenant_id=tenant,
+            trabajo_id=UUID(trabajo_id),
+            contenido=contenido,
+            tipo_mime=tipo_mime,
+            nombre=nombre,
+        )
+    )
+
+
+async def generar_exportacion(ctx: dict[str, Any], tenant_id: str, exportacion_id: str) -> None:
+    """Job de reporte: consulta, genera el fichero y lo deja en storage."""
+    from uuid import UUID
+
+    contenedor: Contenedor = ctx["contenedor"]
+    await contenedor.generar_exportacion.ejecutar(
+        tenant_id=UUID(tenant_id), exportacion_id=UUID(exportacion_id)
+    )
+
+
 async def refrescar_tokens_proximos_a_vencer(ctx: dict[str, Any]) -> None:
     """
     Tarea periodica de mantenimiento de credenciales.
@@ -138,7 +185,7 @@ class WorkerDeIngesta:
     horizontalmente: basta aumentar replicas cuando crece la cola.
     """
 
-    functions: ClassVar[list[Any]] = [ejecutar_escaneo]
+    functions: ClassVar[list[Any]] = [ejecutar_escaneo, extraer_adjunto, generar_exportacion]
     on_startup = _al_arrancar
     on_shutdown = _al_apagar
     redis_settings = _redis_settings()

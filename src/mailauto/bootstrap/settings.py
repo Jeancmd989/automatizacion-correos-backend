@@ -119,6 +119,22 @@ class Settings(BaseSettings):
         ]
     )
 
+    # ── Extraccion ───────────────────────────────────────────────────
+    # Sin clave, la estrategia de vision no se registra y el pipeline
+    # funciona igual con los tres motores gratuitos.
+    anthropic_api_key: str | None = None
+    vision_ai_habilitada: bool = False
+    vision_modelo: str = "claude-opus-5-5"
+    # Esfuerzo bajo: transcribir campos de un formulario conocido es
+    # una tarea de clasificacion, no de razonamiento.
+    vision_esfuerzo: str = "low"
+    # Tope de llamadas de pago por escaneo. Acota el gasto de un
+    # trabajo con cientos de adjuntos ilegibles.
+    vision_maximo_llamadas_por_trabajo: Annotated[int, Field(ge=0, le=10_000)] = 50
+
+    # ── Reportes ─────────────────────────────────────────────────────
+    reporte_maximo_filas: Annotated[int, Field(ge=1, le=200_000)] = 50_000
+
     # ── Cuotas y rate limiting ───────────────────────────────────────
     rate_limit_default_per_minute: Annotated[int, Field(ge=1)] = 120
     rate_limit_scan_per_hour: Annotated[int, Field(ge=1)] = 20
@@ -227,6 +243,17 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"Configuracion insegura para environment={self.environment}:\n  - {detalle}"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _exigir_clave_si_la_vision_esta_habilitada(self) -> Self:
+        """
+        Habilitar la vision sin credencial dejaria el pipeline
+        degradado en silencio: los documentos ilegibles irian todos a
+        revision humana sin que nadie entendiera por que.
+        """
+        if self.vision_ai_habilitada and not self.anthropic_api_key:
+            raise ValueError("VISION_AI_HABILITADA requiere ANTHROPIC_API_KEY")
         return self
 
     @model_validator(mode="after")

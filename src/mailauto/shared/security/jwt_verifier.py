@@ -196,7 +196,7 @@ class VerificadorDeTokens:
 
         return self._extraer_claims(carga)
 
-    async def _resolver_clave(self, kid: str) -> Any:
+    async def _resolver_clave(self, kid: str) -> Any:  # noqa: ANN401 - tipo de clave opaco de PyJWT
         cliente = await self._obtener_cliente()
         try:
             return cliente.get_signing_key(kid).key

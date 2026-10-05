@@ -108,6 +108,25 @@
         "title": "ContadoresSalida",
         "type": "object"
       },
+      "CorreccionEntrada": {
+        "additionalProperties": false,
+        "properties": {
+          "correcciones": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 12,
+            "minProperties": 1,
+            "title": "Correcciones",
+            "type": "object"
+          }
+        },
+        "required": [
+          "correcciones"
+        ],
+        "title": "CorreccionEntrada",
+        "type": "object"
+      },
       "EntradaDeAuditoriaSalida": {
         "properties": {
           "accion": {
@@ -305,6 +324,78 @@
         "title": "EscaneoSalida",
         "type": "object"
       },
+      "ExportacionSalida": {
+        "properties": {
+          "creado_en": {
+            "format": "date-time",
+            "title": "Creado En",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "finalizado_en": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finalizado En"
+          },
+          "formato": {
+            "title": "Formato",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "mensaje_de_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mensaje De Error"
+          },
+          "total_filas": {
+            "title": "Total Filas",
+            "type": "integer"
+          },
+          "url_de_descarga": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url De Descarga"
+          }
+        },
+        "required": [
+          "id",
+          "formato",
+          "estado",
+          "total_filas",
+          "mensaje_de_error",
+          "url_de_descarga",
+          "creado_en",
+          "finalizado_en"
+        ],
+        "title": "ExportacionSalida",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -431,6 +522,175 @@
         "title": "PerfilSalida",
         "type": "object"
       },
+      "RegistroSalida": {
+        "properties": {
+          "adjunto_id": {
+            "format": "uuid",
+            "title": "Adjunto Id",
+            "type": "string"
+          },
+          "campos_dudosos": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Campos Dudosos",
+            "type": "array"
+          },
+          "completitud": {
+            "title": "Completitud",
+            "type": "string"
+          },
+          "confianza_por_campo": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Confianza Por Campo",
+            "type": "object"
+          },
+          "creado_en": {
+            "format": "date-time",
+            "title": "Creado En",
+            "type": "string"
+          },
+          "estado_de_revision": {
+            "title": "Estado De Revision",
+            "type": "string"
+          },
+          "estrategia_usada": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estrategia Usada"
+          },
+          "fecha_de_pago": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha De Pago"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "importe": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Importe"
+          },
+          "moneda": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moneda"
+          },
+          "nombre_contribuyente": {
+            "title": "Nombre Contribuyente",
+            "type": "string"
+          },
+          "nombre_inquilino": {
+            "title": "Nombre Inquilino",
+            "type": "string"
+          },
+          "numero_de_operacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero De Operacion"
+          },
+          "perfil": {
+            "title": "Perfil",
+            "type": "string"
+          },
+          "periodo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Periodo"
+          },
+          "ruc_contribuyente": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ruc Contribuyente"
+          },
+          "ruc_inquilino": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ruc Inquilino"
+          },
+          "trabajo_id": {
+            "format": "uuid",
+            "title": "Trabajo Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "adjunto_id",
+          "trabajo_id",
+          "perfil",
+          "ruc_contribuyente",
+          "nombre_contribuyente",
+          "ruc_inquilino",
+          "nombre_inquilino",
+          "periodo",
+          "fecha_de_pago",
+          "numero_de_operacion",
+          "importe",
+          "moneda",
+          "completitud",
+          "estado_de_revision",
+          "campos_dudosos",
+          "confianza_por_campo",
+          "estrategia_usada",
+          "creado_en"
+        ],
+        "title": "RegistroSalida",
+        "type": "object"
+      },
       "Respuesta_BuzonSalida_": {
         "properties": {
           "data": {
@@ -489,6 +749,35 @@
         "title": "Respuesta[EscaneoSalida]",
         "type": "object"
       },
+      "Respuesta_ExportacionSalida_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ExportacionSalida"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "status": {
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Respuesta[ExportacionSalida]",
+        "type": "object"
+      },
       "Respuesta_PerfilSalida_": {
         "properties": {
           "data": {
@@ -516,6 +805,35 @@
           "data"
         ],
         "title": "Respuesta[PerfilSalida]",
+        "type": "object"
+      },
+      "Respuesta_RegistroSalida_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RegistroSalida"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "status": {
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Respuesta[RegistroSalida]",
         "type": "object"
       },
       "Respuesta_SaludSalida_": {
@@ -574,6 +892,39 @@
           "data"
         ],
         "title": "Respuesta[UrlDeAutorizacionSalida]",
+        "type": "object"
+      },
+      "Respuesta_dict_str__int__": {
+        "properties": {
+          "data": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Data",
+            "type": "object"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "status": {
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Respuesta[dict[str, int]]",
         "type": "object"
       },
       "Respuesta_list_BuzonSalida__": {
@@ -708,6 +1059,39 @@
         "title": "Respuesta[list[EscaneoSalida]]",
         "type": "object"
       },
+      "Respuesta_list_RegistroSalida__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/RegistroSalida"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "status": {
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Respuesta[list[RegistroSalida]]",
+        "type": "object"
+      },
       "SaludSalida": {
         "properties": {
           "componentes": {
@@ -733,6 +1117,43 @@
           "estado"
         ],
         "title": "SaludSalida",
+        "type": "object"
+      },
+      "SolicitarExportacionEntrada": {
+        "additionalProperties": false,
+        "properties": {
+          "formato": {
+            "default": "xlsx",
+            "pattern": "^(xlsx|csv)$",
+            "title": "Formato",
+            "type": "string"
+          },
+          "periodo": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{6}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Periodo"
+          },
+          "ruc": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{11}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ruc"
+          }
+        },
+        "title": "SolicitarExportacionEntrada",
         "type": "object"
       },
       "UrlDeAutorizacionSalida": {
@@ -1240,6 +1661,778 @@
         "summary": "Perfil",
         "tags": [
           "perfil"
+        ]
+      }
+    },
+    "/api/v1/records": {
+      "get": {
+        "description": "Listado principal, paginado por cursor.",
+        "operationId": "listar_registros_api_v1_records_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "trabajo_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Trabajo Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ruc",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 11,
+                  "pattern": "^\\d{11}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ruc"
+            }
+          },
+          {
+            "in": "query",
+            "name": "periodo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 6,
+                  "pattern": "^\\d{6}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Periodo"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limite",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limite",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_list_RegistroSalida__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Listar Registros",
+        "tags": [
+          "registros"
+        ]
+      }
+    },
+    "/api/v1/records/{registro_id}": {
+      "get": {
+        "operationId": "obtener_registro_api_v1_records__registro_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "registro_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Registro Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_RegistroSalida_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Obtener Registro",
+        "tags": [
+          "registros"
+        ]
+      },
+      "patch": {
+        "description": "Aplica las correcciones de una persona y aprueba el registro.\n\nLos valores llegan como texto y pasan por los mismos objetos de\nvalor que la extraccion automatica: una persona tambien teclea mal\nun RUC, y aceptarlo sin verificar dejaria entrar justo el error\nque el pipeline existe para evitar.",
+        "operationId": "corregir_registro_api_v1_records__registro_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "registro_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Registro Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorreccionEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_RegistroSalida_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Corregir Registro",
+        "tags": [
+          "registros"
+        ]
+      }
+    },
+    "/api/v1/records/{registro_id}/approve": {
+      "post": {
+        "description": "El revisor confirma que lo extraido es correcto.",
+        "operationId": "aprobar_registro_api_v1_records__registro_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "registro_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Registro Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_RegistroSalida_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Aprobar Registro",
+        "tags": [
+          "registros"
+        ]
+      }
+    },
+    "/api/v1/records/{registro_id}/reject": {
+      "post": {
+        "description": "Marca el registro como no utilizable: documento ilegible o ajeno.",
+        "operationId": "rechazar_registro_api_v1_records__registro_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "registro_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Registro Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_RegistroSalida_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rechazar Registro",
+        "tags": [
+          "registros"
+        ]
+      }
+    },
+    "/api/v1/reports/exports": {
+      "post": {
+        "description": "Encola la generacion del reporte y devuelve su identificador.",
+        "operationId": "solicitar_exportacion_api_v1_reports_exports_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitarExportacionEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_ExportacionSalida_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Solicitar Exportacion",
+        "tags": [
+          "registros"
+        ]
+      }
+    },
+    "/api/v1/reports/exports/{exportacion_id}": {
+      "get": {
+        "description": "Estado de la exportacion y, cuando esta lista, su URL de descarga.\n\nLa URL vive cinco minutos: lleva los datos tributarios del cliente\ny suele acabar pegada en un chat.",
+        "operationId": "consultar_exportacion_api_v1_reports_exports__exportacion_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "exportacion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Exportacion Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_ExportacionSalida_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Consultar Exportacion",
+        "tags": [
+          "registros"
+        ]
+      }
+    },
+    "/api/v1/review": {
+      "get": {
+        "description": "Registros que el pipeline no pudo dar por buenos.",
+        "operationId": "cola_de_revision_api_v1_review_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limite",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limite",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_list_RegistroSalida__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cola De Revision",
+        "tags": [
+          "registros"
+        ]
+      }
+    },
+    "/api/v1/review/count": {
+      "get": {
+        "description": "Contador para el aviso de la interfaz.",
+        "operationId": "pendientes_de_revision_api_v1_review_count_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_dict_str__int__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pendientes De Revision",
+        "tags": [
+          "registros"
         ]
       }
     },

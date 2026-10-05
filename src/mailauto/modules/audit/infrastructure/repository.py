@@ -81,7 +81,7 @@ class RegistroDeAuditoriaPostgres(RegistroDeAuditoria):
                         metadatos=metadatos or {},
                     )
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001 - la auditoria nunca hace fallar la accion auditada
             # La auditoria no puede hacer fallar la accion auditada. Se
             # emite a nivel error para que el monitoreo lo detecte: perder
             # trazabilidad es un incidente, aunque no sea un fallo visible.

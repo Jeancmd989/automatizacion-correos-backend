@@ -372,7 +372,7 @@ class EjecutarEscaneo:
             },
         )
 
-        await self._repositorio.guardar_adjunto(
+        adjunto = await self._repositorio.guardar_adjunto(
             trabajo.tenant_id,
             Adjunto(
                 tenant_id=trabajo.tenant_id,
@@ -385,6 +385,20 @@ class EjecutarEscaneo:
             ),
         )
         trabajo.contadores.adjuntos_descargados += 1
+
+        # La extraccion va en su propio job y no aqui mismo: parsear un
+        # PDF puede tardar segundos y bloquearia la descarga de los
+        # correos restantes. Separarlos permite ademas escalar los dos
+        # workers por separado, que es lo que hace falta cuando el
+        # cuello de botella es el OCR y no la red.
+        await self._cola.encolar_extraccion(
+            tenant_id=trabajo.tenant_id,
+            trabajo_id=trabajo.id,
+            adjunto_id=adjunto.id,
+            clave_de_almacenamiento=clave,
+            tipo_mime=validacion.tipo_mime_real,
+            nombre=referencia.nombre[:255],
+        )
 
     # ── Auxiliares ───────────────────────────────────────────────────
 

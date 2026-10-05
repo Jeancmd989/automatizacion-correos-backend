@@ -137,6 +137,17 @@ class AlmacenDeObjetos(ABC):
     ) -> None: ...
 
     @abstractmethod
+    async def descargar(self, clave: str) -> bytes:
+        """
+        Devuelve el contenido del objeto.
+
+        Lo usa el worker de extraccion, que necesita los bytes en
+        memoria para parsearlos. Para entregar un fichero al navegador
+        se usa `url_de_descarga`: hacer de proxy mantendria la conexion
+        abierta durante toda la transferencia.
+        """
+
+    @abstractmethod
     async def url_de_descarga(self, clave: str, *, ttl_segundos: int) -> str:
         """URL prefirmada de vida corta. Nunca se expone el bucket directamente."""
 
@@ -172,6 +183,26 @@ class ColaDeTrabajos(ABC):
     @abstractmethod
     async def encolar_escaneo(self, *, tenant_id: UUID, trabajo_id: UUID) -> str:
         """Encola el trabajo y devuelve el identificador del job."""
+
+    @abstractmethod
+    async def encolar_extraccion(
+        self,
+        *,
+        tenant_id: UUID,
+        trabajo_id: UUID,
+        adjunto_id: UUID,
+        clave_de_almacenamiento: str,
+        tipo_mime: str,
+        nombre: str,
+    ) -> str:
+        """
+        Encola la extraccion de un adjunto ya almacenado.
+
+        Un job por adjunto y no uno por escaneo: es lo que permite que
+        varios workers procesen el mismo buzon en paralelo y que un
+        documento problematico se reintente solo, sin arrastrar a los
+        demas del lote.
+        """
 
     @abstractmethod
     async def solicitar_cancelacion(self, trabajo_id: UUID) -> None:

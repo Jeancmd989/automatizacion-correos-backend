@@ -182,6 +182,9 @@ class AlmacenFalso(AlmacenDeObjetos):
     ) -> None:
         self.objetos[clave] = contenido
 
+    async def descargar(self, clave: str) -> bytes:
+        return self.objetos[clave]
+
     async def url_de_descarga(self, clave: str, *, ttl_segundos: int) -> str:
         return f"https://storage/{clave}"
 
@@ -196,9 +199,24 @@ class ColaFalsa(ColaDeTrabajos):
     def __init__(self, *, cancelar_en: int | None = None) -> None:
         self._cancelar_en = cancelar_en
         self._consultas = 0
+        # Cada adjunto guardado debe encolar su propia extraccion.
+        self.extracciones: list[UUID] = []
 
     async def encolar_escaneo(self, *, tenant_id: UUID, trabajo_id: UUID) -> str:
         return "job"
+
+    async def encolar_extraccion(
+        self,
+        *,
+        tenant_id: UUID,
+        trabajo_id: UUID,
+        adjunto_id: UUID,
+        clave_de_almacenamiento: str,
+        tipo_mime: str,
+        nombre: str,
+    ) -> str:
+        self.extracciones.append(adjunto_id)
+        return "extract"
 
     async def solicitar_cancelacion(self, trabajo_id: UUID) -> None:
         self._cancelar_en = 0

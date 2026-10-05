@@ -27,15 +27,44 @@ Decision de diseño
 from __future__ import annotations
 
 from dataclasses import dataclass
-from uuid import UUID
 
 from arq import create_pool
 from arq.connections import ArqRedis, RedisSettings
 from redis.asyncio import Redis
 
+from mailauto.bootstrap.adaptadores import (
+    AdaptadorDeCredenciales,
+    AdaptadorDeDestinoDeReportes,
+    AdaptadorDeFilasDeReporte,
+    AdaptadorDeLecturaDeAdjuntos,
+)
 from mailauto.bootstrap.settings import Settings
 from mailauto.modules.audit.domain.ports import RegistroDeAuditoria
 from mailauto.modules.audit.infrastructure.repository import RegistroDeAuditoriaPostgres
+from mailauto.modules.extraction.application.extraer_documento import (
+    ControlDePresupuesto,
+    ExtraerDocumento,
+)
+from mailauto.modules.extraction.application.revisar_registros import (
+    ConsultarRegistros,
+    RevisarRegistro,
+)
+from mailauto.modules.extraction.domain.ports import EstrategiaDeExtraccion
+from mailauto.modules.extraction.infrastructure.persistence.repository import (
+    RepositorioDeRegistrosPostgres,
+)
+from mailauto.modules.extraction.infrastructure.profiles.sunat_arrendamiento import (
+    PerfilSunatArrendamiento,
+)
+from mailauto.modules.extraction.infrastructure.strategies.ocr import OcrLocal
+from mailauto.modules.extraction.infrastructure.strategies.pdf import (
+    TablasDePdf,
+    TextoNativoDePdf,
+)
+from mailauto.modules.extraction.infrastructure.strategies.vision import (
+    VisionIA,
+    crear_cliente,
+)
 from mailauto.modules.identity.application.resolver_identidad import ResolverIdentidad
 from mailauto.modules.identity.infrastructure.repository import (
     RepositorioDeIdentidadPostgres,
@@ -46,11 +75,7 @@ from mailauto.modules.ingestion.application.gestionar_escaneos import (
     ConsultarEscaneo,
     IniciarEscaneo,
 )
-from mailauto.modules.ingestion.domain.ports import (
-    CredencialDeBuzon,
-    ProveedorDeCorreo,
-    ProveedorDeCredenciales,
-)
+from mailauto.modules.ingestion.domain.ports import ProveedorDeCorreo
 from mailauto.modules.ingestion.infrastructure.almacen_s3 import AlmacenDeObjetosS3
 from mailauto.modules.ingestion.infrastructure.cola_redis import (
     CanalDeProgresoRedis,
@@ -87,31 +112,22 @@ from mailauto.modules.mailbox.infrastructure.repository import (
 from mailauto.modules.mailbox.infrastructure.state_store import (
     AlmacenDeEstadoOAuthRedis,
 )
+from mailauto.modules.reporting.application.exportar import (
+    ConsultarExportacion,
+    GenerarExportacion,
+    SolicitarExportacion,
+)
+from mailauto.modules.reporting.domain.ports import FormatoDeReporte, GeneradorDeReporte
+from mailauto.modules.reporting.infrastructure.generadores import (
+    GeneradorCsv,
+    GeneradorExcel,
+)
+from mailauto.modules.reporting.infrastructure.repository import (
+    RepositorioDeExportacionesPostgres,
+)
 from mailauto.shared.crypto.envelope import ClaveMaestraLocal, ServicioDeCifrado
 from mailauto.shared.db.session import FabricaDeSesiones, crear_engine
 from mailauto.shared.security.jwt_verifier import VerificadorDeTokens
-
-
-class AdaptadorDeCredenciales(ProveedorDeCredenciales):
-    """
-    Puente entre el modulo de buzones y el de ingesta.
-
-    Existe porque los contextos acotados no se importan entre si: la
-    ingesta depende del puerto `ProveedorDeCredenciales`, y es aqui, en el
-    composition root, donde se conecta con `ObtenerTokenVigente`. Es el
-    unico punto del sistema donde los dos modulos se tocan.
-    """
-
-    def __init__(self, obtener_token: ObtenerTokenVigente) -> None:
-        self._obtener_token = obtener_token
-
-    async def obtener(self, *, tenant_id: UUID, conexion_id: UUID) -> CredencialDeBuzon:
-        conexion = await self._obtener_token.por_tenant(tenant_id, conexion_id)
-        return CredencialDeBuzon(
-            proveedor=conexion.proveedor.value,
-            access_token=conexion.access_token,
-            correo_de_la_cuenta=conexion.correo_de_la_cuenta,
-        )
 
 
 @dataclass(slots=True)
@@ -136,6 +152,13 @@ class Contenedor:
     cancelar_escaneo: CancelarEscaneo
     consultar_escaneo: ConsultarEscaneo
     ejecutar_escaneo: EjecutarEscaneo
+    extraer_documento: ExtraerDocumento
+    consultar_registros: ConsultarRegistros
+    revisar_registro: RevisarRegistro
+    solicitar_exportacion: SolicitarExportacion
+    consultar_exportacion: ConsultarExportacion
+    generar_exportacion: GenerarExportacion
+    lector_de_adjuntos: AdaptadorDeLecturaDeAdjuntos
 
     # Infraestructura que la API necesita directamente
     cola: ColaDeTrabajosRedis
@@ -220,6 +243,38 @@ async def construir_contenedor(settings: Settings) -> Contenedor:
         tamano_maximo=settings.max_attachment_bytes,
     )
 
+    # ── Extraccion ───────────────────────────────────────────────────
+    repo_registros = RepositorioDeRegistrosPostgres(sesiones)
+    perfil = PerfilSunatArrendamiento()
+
+    # Los motores gratuitos siempre; el de pago solo si hay credencial
+    # y esta habilitado. Sin el, el pipeline sigue funcionando y los
+    # documentos ilegibles van a revision humana.
+    estrategias: list[EstrategiaDeExtraccion] = [
+        TextoNativoDePdf(),
+        TablasDePdf(),
+        OcrLocal(),
+    ]
+    cliente_vision = (
+        crear_cliente(settings.anthropic_api_key) if settings.vision_ai_habilitada else None
+    )
+    if cliente_vision is not None:
+        estrategias.append(
+            VisionIA(
+                cliente_vision,
+                modelo=settings.vision_modelo,
+                esfuerzo=settings.vision_esfuerzo,
+            )
+        )
+
+    # ── Reportes ─────────────────────────────────────────────────────
+    repo_exportaciones = RepositorioDeExportacionesPostgres(sesiones)
+    destino_reportes = AdaptadorDeDestinoDeReportes(almacen, settings.storage_presign_ttl_seconds)
+    generadores: dict[FormatoDeReporte, GeneradorDeReporte] = {
+        FormatoDeReporte.EXCEL: GeneradorExcel(),
+        FormatoDeReporte.CSV: GeneradorCsv(),
+    }
+
     return Contenedor(
         settings=settings,
         sesiones=sesiones,
@@ -258,6 +313,27 @@ async def construir_contenedor(settings: Settings) -> Contenedor:
             limite_de_bytes=settings.max_attachment_bytes,
             maximo_adjuntos_por_mensaje=settings.max_attachments_per_message,
         ),
+        extraer_documento=ExtraerDocumento(
+            estrategias=estrategias,
+            perfil=perfil,
+            repositorio=repo_registros,
+            presupuesto=ControlDePresupuesto(
+                ia_habilitada=cliente_vision is not None,
+                maximo_llamadas_por_trabajo=settings.vision_maximo_llamadas_por_trabajo,
+            ),
+        ),
+        consultar_registros=ConsultarRegistros(repo_registros),
+        revisar_registro=RevisarRegistro(repo_registros),
+        solicitar_exportacion=SolicitarExportacion(repo_exportaciones, cola.encolar_exportacion),
+        consultar_exportacion=ConsultarExportacion(repo_exportaciones, destino_reportes),
+        generar_exportacion=GenerarExportacion(
+            repositorio=repo_exportaciones,
+            fuente=AdaptadorDeFilasDeReporte(repo_registros),
+            generadores=generadores,
+            destino=destino_reportes,
+            limite_de_filas=settings.reporte_maximo_filas,
+        ),
+        lector_de_adjuntos=AdaptadorDeLecturaDeAdjuntos(almacen),
         cola=cola,
         progreso=progreso,
     )

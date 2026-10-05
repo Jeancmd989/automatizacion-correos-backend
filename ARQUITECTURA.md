@@ -735,12 +735,12 @@ expuesto a Internet todas las bibliotecas nativas de parseo.
 
 | Fase | Contenido | Resultado verificable |
 |------|-----------|----------------------|
-| **0 — Cimientos** | Monorepo, Docker Compose, configuración validada, logging y tracing, health checks, CI con lint + arquitectura + tests | `docker compose up` levanta todo; CI en verde |
-| **1 — Identidad y aislamiento** | Tenants, usuarios, roles, verificación OIDC, `TenantContext`, RLS, audit log | Los tests de acceso cruzado entre tenants reciben un rechazo (cierra **H1**) |
-| **2 — Buzones** | OAuth con PKCE para Google y Microsoft, cifrado envolvente, refresco y revocación de tokens | Vincular, verificar y desvincular un buzón real |
-| **3 — Ingesta** | Cola ARQ, worker de ingesta, listado y descarga en streaming, validación de adjuntos, object storage, SSE de progreso | Escaneo real con progreso en vivo y reanudación tras reinicio (cierra **H2** y **H3**) |
-| **4 — Extracción** | Cadena de estrategias, preprocesamiento OpenCV, perfil SUNAT, objetos de valor con validación, confianza por campo | Precisión medida sobre un set sintético etiquetado |
-| **5 — Revisión y reportes** | Cola de revisión humana, corrección y aprobación, export Excel/CSV asíncrono, estadísticas | Flujo completo extremo a extremo |
+| **0 — Cimientos** ✅ | Monorepo, Docker Compose, configuración validada, logging y tracing, health checks, CI con lint + arquitectura + tests | `docker compose up` levanta todo; CI en verde |
+| **1 — Identidad y aislamiento** ✅ | Tenants, usuarios, roles, verificación OIDC, `TenantContext`, RLS, audit log | Los tests de acceso cruzado entre tenants reciben un rechazo (cierra **H1**) |
+| **2 — Buzones** ✅ | OAuth con PKCE para Google y Microsoft, cifrado envolvente, refresco y revocación de tokens | Vincular, verificar y desvincular un buzón real |
+| **3 — Ingesta** ✅ | Cola ARQ, worker de ingesta, listado y descarga en streaming, validación de adjuntos, object storage, SSE de progreso | Escaneo real con progreso en vivo y reanudación tras reinicio (cierra **H2** y **H3**) |
+| **4 — Extracción** ✅ | Cadena de estrategias, preprocesamiento OpenCV, perfil SUNAT, objetos de valor con validación, confianza por campo | Precisión medida sobre un set sintético etiquetado |
+| **5 — Revisión y reportes** ✅ | Cola de revisión humana, corrección y aprobación, export Excel/CSV asíncrono, estadísticas | Flujo completo extremo a extremo |
 | **6 — Frontend** | Design system, features, cliente generado, BFF, SSE, a11y, tests | Playwright en verde sobre los flujos críticos |
 | **7 — Endurecimiento** | Rate limiting, cuotas, circuit breakers, aislamiento del worker, escaneo de imágenes, firma, pruebas de carga y suite de seguridad | Informe de seguridad y de carga |
 | **8 — Operación** | Runbooks, dashboards, alertas, manual técnico y de usuario, despliegue a producción | Sistema operando y documentado |
