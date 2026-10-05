@@ -1,0 +1,224 @@
+# Automatización de Correos — Backend
+
+Ingesta de adjuntos de correo (Gmail / Outlook) y extracción de datos tributarios SUNAT,
+con aislamiento estricto entre clientes, workers asíncronos y progreso en vivo.
+
+API en **FastAPI** sobre **PostgreSQL** con Row Level Security, cola **ARQ/Redis**,
+almacenamiento **S3/MinIO** y arquitectura hexagonal **verificada en CI**.
+
+---
+
+## Estado
+
+Implementadas las **fases 0 a 3** del [plan de arquitectura](ARQUITECTURA.md#17-plan-de-implementación-por-fases):
+
+| Fase | Contenido | Estado |
+|------|-----------|--------|
+| 0 | Cimientos, Docker, configuración validada, observabilidad, CI | ✅ |
+| 1 | Identidad, roles, RLS, auditoría | ✅ |
+| 2 | OAuth con PKCE, cifrado envolvente, refresco y revocación | ✅ |
+| 3 | Cola, worker de ingesta, validación de adjuntos, storage, SSE | ✅ |
+| 4 | Extracción multi-estrategia (PDF / OCR / visión IA) | pendiente |
+| 5 | Revisión humana y reportes Excel | pendiente |
+| 6–8 | Frontend, endurecimiento, operación | pendiente |
+
+**Verificación actual:** 124 tests en verde, 6/6 contratos de arquitectura, `mypy --strict`
+sin hallazgos, `ruff` y `bandit` limpios. Los tests de integración con contenedores
+(fase 7) todavía no están escritos.
+
+---
+
+## Puesta en marcha
+
+Requiere Docker. No hace falta instalar Python, PostgreSQL ni Tesseract en la máquina.
+
+```bash
+cp .env.example .env
+```
+
+Genera la clave maestra y pégala en `MASTER_KEY_B64`:
+
+```bash
+python -c "import base64,os; print(base64.b64encode(os.urandom(32)).decode())"
+```
+
+Completa las credenciales OAuth de Google y/o Microsoft y levanta todo:
+
+```bash
+docker compose up
+```
+
+Esto arranca API, worker de ingesta, worker de cron, PostgreSQL, Redis, MinIO y Jaeger,
+y aplica las migraciones antes de que la API acepte tráfico.
+
+| Servicio | URL |
+|----------|-----|
+| API | http://localhost:8000 |
+| Documentación interactiva | http://localhost:8000/docs |
+| Consola de MinIO | http://localhost:9001 |
+| Trazas (Jaeger) | http://localhost:16686 |
+
+---
+
+## Desarrollo sin Docker
+
+```bash
+python -m venv .venv && .venv/Scripts/activate   # Linux/macOS: source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+Necesitas PostgreSQL y Redis accesibles, y aplicar las migraciones:
+
+```bash
+alembic upgrade head
+```
+
+```bash
+uvicorn mailauto.bootstrap.app:crear_app --factory --reload
+```
+
+```bash
+arq mailauto.workers.settings.WorkerDeIngesta
+```
+
+---
+
+## Verificación
+
+Lo mismo que ejecuta el CI, en orden:
+
+```bash
+ruff format --check src tests migrations && ruff check src tests migrations
+```
+
+```bash
+lint-imports --config importlinter.ini
+```
+
+```bash
+mypy --config-file pyproject.toml
+```
+
+```bash
+pytest -q
+```
+
+```bash
+bandit -q -c pyproject.toml -r src && pip-audit
+```
+
+`lint-imports` es el que conviene no saltarse: verifica que las capas no se han cruzado.
+Un import "temporal" de infraestructura dentro del dominio falla el pipeline, y es así
+como la arquitectura se mantiene con el tiempo en vez de degradarse.
+
+---
+
+## Arquitectura
+
+Documento completo en [ARQUITECTURA.md](ARQUITECTURA.md). Resumen:
+
+```
+  api  ──▶  application  ──▶  domain  ◀──  infrastructure
+                                 ▲               │
+                                 └───────────────┘
+                             implementa los puertos
+```
+
+- **domain** — entidades, objetos de valor y puertos. No importa SQLAlchemy, FastAPI ni httpx.
+- **application** — casos de uso sobre puertos abstractos. Testeables sin red ni base de datos.
+- **infrastructure** — adaptadores concretos (PostgreSQL, Redis, S3, Gmail, Graph).
+- **api** — routers delgados que delegan.
+- **bootstrap** — *composition root*, único punto que conoce todas las capas.
+
+Seis contextos acotados independientes: `identity`, `mailbox`, `ingestion`, `extraction`,
+`reporting`, `audit`. No se importan entre sí; la comunicación pasa por el composition root
+(ver `AdaptadorDeCredenciales` en `bootstrap/container.py`).
+
+```
+src/mailauto/
+├── bootstrap/     configuración, contenedor de dependencias, fábrica de la app
+├── shared/        cripto, seguridad, observabilidad, paginación, sesiones de BD
+├── modules/       identity · mailbox · ingestion · audit
+├── api/           routers v1, middlewares, DTOs
+└── workers/       definiciones de los workers ARQ
+```
+
+---
+
+## Seguridad
+
+Cobertura detallada en [ARQUITECTURA.md §9](ARQUITECTURA.md#9-seguridad). Lo esencial:
+
+**Aislamiento entre clientes, en dos capas independientes.** Todo repositorio exige un
+`TenantContext` en su firma, y además PostgreSQL aplica Row Level Security con
+`FORCE ROW LEVEL SECURITY`. Un `WHERE` olvidado devuelve cero filas en lugar de datos
+ajenos.
+
+> ⚠️ **La aplicación debe conectarse con un rol que no sea propietario de las tablas ni
+> superusuario.** PostgreSQL exime a ambos de las políticas RLS: el aislamiento quedaría
+> desactivado sin ningún error ni aviso. En desarrollo lo garantiza
+> [`scripts/init-db.sql`](scripts/init-db.sql); en producción debe reproducirlo la
+> infraestructura.
+
+**Credenciales OAuth.** Cifrado sobre envolvente: una DEK por cliente, envuelta por una
+clave maestra en KMS. AES-256-GCM con AAD = `tenant|propósito|sujeto`, de modo que un
+ciphertext copiado a otra fila no descifra. `key_version` permite rotar sin downtime.
+
+**Adjuntos.** Son la superficie de ataque principal: ficheros de terceros que acabarán en
+parsers nativos. Se validan por contenido real (nunca por extensión), con allowlist cerrada
+de tipos, topes de tamaño aplicados durante la transferencia, y rechazo de PDFs con
+JavaScript, `/Launch`, ficheros embebidos o patrón de bomba de descompresión. Se almacenan
+con clave UUID: el nombre del adjunto nunca influye en la ruta.
+
+**Configuración.** Se valida al arrancar. Con `ENVIRONMENT=production`, la aplicación
+**no levanta** si `CORS_ORIGINS` contiene `*`, si `/docs` está habilitado, si
+`KMS_PROVIDER=local` o si se intenta persistir texto OCR crudo. Un contenedor que no
+arranca es visible; una brecha silenciosa no.
+
+**Logs.** Un procesador de redacción obligatorio enmascara tokens, cabeceras de
+autorización y campos personales a cualquier profundidad, antes de serializar.
+
+---
+
+## API
+
+Prefijo `/api/v1`. Errores en formato RFC 9457 (Problem Details). Listados paginados por
+cursor, nunca sin límite.
+
+| Método | Ruta | Permiso |
+|--------|------|---------|
+| GET | `/health/live` · `/health/ready` | público |
+| GET | `/api/v1/me` | autenticado |
+| GET | `/api/v1/mailboxes` | `mailbox:read` |
+| POST | `/api/v1/mailboxes/authorize` | `mailbox:write` |
+| POST | `/api/v1/mailboxes/callback` | `mailbox:write` |
+| DELETE | `/api/v1/mailboxes/{id}` | `mailbox:write` |
+| POST | `/api/v1/scans` | `scan:run` |
+| GET | `/api/v1/scans` · `/api/v1/scans/{id}` | `scan:read` |
+| GET | `/api/v1/scans/{id}/stream` (SSE) | `scan:read` |
+| GET | `/api/v1/scans/{id}/errors` | `scan:read` |
+| POST | `/api/v1/scans/{id}/cancel` | `scan:run` |
+| GET | `/api/v1/audit` | `admin:read` |
+
+Cabeceras: `Authorization: Bearer`, `X-Tenant-Id` (si el usuario pertenece a varios
+espacios de trabajo), `Idempotency-Key` en `POST /scans`, `X-Request-ID`.
+
+---
+
+## Antes de salir a producción
+
+**La verificación de Google no es un trámite menor.** El alcance `gmail.readonly` es un
+*restricted scope*: publicar exige verificación por parte de Google y, al superar el umbral
+de usuarios, una evaluación de seguridad CASA realizada por un asesor autorizado. Tiene
+coste y plazo reales, y bloquea el lanzamiento si se deja para el final. Conviene iniciar
+el trámite en paralelo al desarrollo.
+
+Además: provisionar el rol de base de datos sin privilegios de propietario, mover la clave
+maestra a un KMS, configurar `CORS_ORIGINS` con el dominio real y desactivar `/docs`.
+
+---
+
+## Documentación
+
+- [ARQUITECTURA.md](ARQUITECTURA.md) — diseño completo, decisiones y plan por fases
+- `/docs` — OpenAPI interactivo (solo fuera de producción)
