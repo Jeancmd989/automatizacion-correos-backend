@@ -25,14 +25,20 @@ RUN apt-get update \
 COPY pyproject.toml ./
 COPY src/ ./src/
 
-# El upgrade posterior a la instalacion fuerza la version
-# parcheada de dos paquetes que llegan como transitivos: el
-# resolutor puede dejar una anterior si otra dependencia la
-# admite, y el escaneo de imagen lo detecta.
+# El upgrade posterior a la instalacion fuerza la version parcheada
+# de dos transitivas que el resolutor podria dejar en una anterior.
+#
+# Y despues se desinstalan pip y wheel. No es solo por tamaño: pip
+# lleva copias embebidas de urllib3 y setuptools en su directorio
+# `_vendor`, con sus propios .dist-info, y los escaneres las
+# reportan como paquetes vulnerables aunque las versiones reales
+# esten al dia. El runtime no instala nada, asi que pip solo aporta
+# superficie de ataque y ruido en los informes.
 RUN python -m venv /opt/venv \
  && /opt/venv/bin/pip install --upgrade pip setuptools wheel \
  && /opt/venv/bin/pip install . \
- && /opt/venv/bin/pip install --no-cache-dir --upgrade 'setuptools>=84.0.0' 'urllib3>=2.8.0'
+ && /opt/venv/bin/pip install --no-cache-dir --upgrade 'setuptools>=84.0.0' 'urllib3>=2.8.0' \
+ && /opt/venv/bin/pip uninstall -y pip wheel
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -50,6 +56,7 @@ RUN groupadd --gid 10001 mailauto \
  && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends libpq5 curl \
  && /usr/local/bin/python -m pip install --no-cache-dir --upgrade 'setuptools>=84.0.0' \
+ && /usr/local/bin/python -m pip uninstall -y pip \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
