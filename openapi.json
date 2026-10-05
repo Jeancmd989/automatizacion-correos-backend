@@ -484,6 +484,29 @@
         "title": "IniciarVinculacionEntrada",
         "type": "object"
       },
+      "MetaDePagina": {
+        "description": "Metadatos de paginacion. Presentes solo en los listados.",
+        "properties": {
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          },
+          "hay_mas": {
+            "default": false,
+            "title": "Hay Mas",
+            "type": "boolean"
+          }
+        },
+        "title": "MetaDePagina",
+        "type": "object"
+      },
       "PerfilSalida": {
         "properties": {
           "email": {
@@ -699,14 +722,12 @@
           "meta": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/MetaDePagina"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Meta"
+            ]
           },
           "status": {
             "default": "ok",
@@ -728,14 +749,12 @@
           "meta": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/MetaDePagina"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Meta"
+            ]
           },
           "status": {
             "default": "ok",
@@ -757,14 +776,12 @@
           "meta": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/MetaDePagina"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Meta"
+            ]
           },
           "status": {
             "default": "ok",
@@ -786,14 +803,12 @@
           "meta": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/MetaDePagina"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Meta"
+            ]
           },
           "status": {
             "default": "ok",
@@ -815,14 +830,12 @@
           "meta": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/MetaDePagina"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Meta"
+            ]
           },
           "status": {
             "default": "ok",
@@ -844,14 +857,12 @@
           "meta": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/MetaDePagina"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Meta"
+            ]
           },
           "status": {
             "default": "ok",
@@ -873,14 +884,12 @@
           "meta": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/MetaDePagina"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Meta"
+            ]
           },
           "status": {
             "default": "ok",
@@ -906,14 +915,12 @@
           "meta": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/MetaDePagina"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Meta"
+            ]
           },
           "status": {
             "default": "ok",
@@ -939,14 +946,12 @@
           "meta": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/MetaDePagina"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Meta"
+            ]
           },
           "status": {
             "default": "ok",
@@ -972,14 +977,12 @@
           "meta": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/MetaDePagina"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Meta"
+            ]
           },
           "status": {
             "default": "ok",
@@ -1005,14 +1008,12 @@
           "meta": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/MetaDePagina"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Meta"
+            ]
           },
           "status": {
             "default": "ok",
@@ -1038,14 +1039,12 @@
           "meta": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/MetaDePagina"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Meta"
+            ]
           },
           "status": {
             "default": "ok",
@@ -1071,14 +1070,12 @@
           "meta": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/MetaDePagina"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Meta"
+            ]
           },
           "status": {
             "default": "ok",
@@ -1221,7 +1218,7 @@
     "/api/v1/audit": {
       "get": {
         "description": "Bitacora del tenant. Requiere rol administrativo.",
-        "operationId": "auditoria_api_v1_audit_get",
+        "operationId": "perfil_auditoria",
         "parameters": [
           {
             "in": "query",
@@ -1315,7 +1312,7 @@
     },
     "/api/v1/mailboxes": {
       "get": {
-        "operationId": "listar_api_v1_mailboxes_get",
+        "operationId": "buzones_listar",
         "parameters": [
           {
             "in": "header",
@@ -1381,7 +1378,7 @@
     "/api/v1/mailboxes/authorize": {
       "post": {
         "description": "Devuelve la URL de consentimiento. El `state` y el PKCE quedan en Redis.",
-        "operationId": "autorizar_api_v1_mailboxes_authorize_post",
+        "operationId": "buzones_autorizar",
         "parameters": [
           {
             "in": "header",
@@ -1457,7 +1454,7 @@
     "/api/v1/mailboxes/callback": {
       "post": {
         "description": "Completa la vinculacion canjeando el codigo por tokens.",
-        "operationId": "callback_api_v1_mailboxes_callback_post",
+        "operationId": "buzones_callback",
         "parameters": [
           {
             "in": "header",
@@ -1533,7 +1530,7 @@
     "/api/v1/mailboxes/{conexion_id}": {
       "delete": {
         "description": "Revoca el consentimiento en el proveedor y elimina la conexion.",
-        "operationId": "desvincular_api_v1_mailboxes__conexion_id__delete",
+        "operationId": "buzones_desvincular",
         "parameters": [
           {
             "in": "path",
@@ -1601,7 +1598,7 @@
     },
     "/api/v1/me": {
       "get": {
-        "operationId": "perfil_api_v1_me_get",
+        "operationId": "perfil_perfil",
         "parameters": [
           {
             "in": "header",
@@ -1667,7 +1664,7 @@
     "/api/v1/records": {
       "get": {
         "description": "Listado principal, paginado por cursor.",
-        "operationId": "listar_registros_api_v1_records_get",
+        "operationId": "registros_listar_registros",
         "parameters": [
           {
             "in": "query",
@@ -1814,7 +1811,7 @@
     },
     "/api/v1/records/{registro_id}": {
       "get": {
-        "operationId": "obtener_registro_api_v1_records__registro_id__get",
+        "operationId": "registros_obtener_registro",
         "parameters": [
           {
             "in": "path",
@@ -1888,7 +1885,7 @@
       },
       "patch": {
         "description": "Aplica las correcciones de una persona y aprueba el registro.\n\nLos valores llegan como texto y pasan por los mismos objetos de\nvalor que la extraccion automatica: una persona tambien teclea mal\nun RUC, y aceptarlo sin verificar dejaria entrar justo el error\nque el pipeline existe para evitar.",
-        "operationId": "corregir_registro_api_v1_records__registro_id__patch",
+        "operationId": "registros_corregir_registro",
         "parameters": [
           {
             "in": "path",
@@ -1974,7 +1971,7 @@
     "/api/v1/records/{registro_id}/approve": {
       "post": {
         "description": "El revisor confirma que lo extraido es correcto.",
-        "operationId": "aprobar_registro_api_v1_records__registro_id__approve_post",
+        "operationId": "registros_aprobar_registro",
         "parameters": [
           {
             "in": "path",
@@ -2050,7 +2047,7 @@
     "/api/v1/records/{registro_id}/reject": {
       "post": {
         "description": "Marca el registro como no utilizable: documento ilegible o ajeno.",
-        "operationId": "rechazar_registro_api_v1_records__registro_id__reject_post",
+        "operationId": "registros_rechazar_registro",
         "parameters": [
           {
             "in": "path",
@@ -2126,7 +2123,7 @@
     "/api/v1/reports/exports": {
       "post": {
         "description": "Encola la generacion del reporte y devuelve su identificador.",
-        "operationId": "solicitar_exportacion_api_v1_reports_exports_post",
+        "operationId": "registros_solicitar_exportacion",
         "parameters": [
           {
             "in": "header",
@@ -2202,7 +2199,7 @@
     "/api/v1/reports/exports/{exportacion_id}": {
       "get": {
         "description": "Estado de la exportacion y, cuando esta lista, su URL de descarga.\n\nLa URL vive cinco minutos: lleva los datos tributarios del cliente\ny suele acabar pegada en un chat.",
-        "operationId": "consultar_exportacion_api_v1_reports_exports__exportacion_id__get",
+        "operationId": "registros_consultar_exportacion",
         "parameters": [
           {
             "in": "path",
@@ -2278,7 +2275,7 @@
     "/api/v1/review": {
       "get": {
         "description": "Registros que el pipeline no pudo dar por buenos.",
-        "operationId": "cola_de_revision_api_v1_review_get",
+        "operationId": "registros_cola_de_revision",
         "parameters": [
           {
             "in": "query",
@@ -2373,7 +2370,7 @@
     "/api/v1/review/count": {
       "get": {
         "description": "Contador para el aviso de la interfaz.",
-        "operationId": "pendientes_de_revision_api_v1_review_count_get",
+        "operationId": "registros_pendientes_de_revision",
         "parameters": [
           {
             "in": "header",
@@ -2438,7 +2435,7 @@
     },
     "/api/v1/scans": {
       "get": {
-        "operationId": "listar_api_v1_scans_get",
+        "operationId": "escaneos_listar",
         "parameters": [
           {
             "in": "query",
@@ -2531,7 +2528,7 @@
       },
       "post": {
         "description": "Encola un escaneo. Idempotente si se envia `Idempotency-Key`.",
-        "operationId": "iniciar_api_v1_scans_post",
+        "operationId": "escaneos_iniciar",
         "parameters": [
           {
             "in": "header",
@@ -2623,7 +2620,7 @@
     },
     "/api/v1/scans/{trabajo_id}": {
       "get": {
-        "operationId": "obtener_api_v1_scans__trabajo_id__get",
+        "operationId": "escaneos_obtener",
         "parameters": [
           {
             "in": "path",
@@ -2698,7 +2695,7 @@
     },
     "/api/v1/scans/{trabajo_id}/cancel": {
       "post": {
-        "operationId": "cancelar_api_v1_scans__trabajo_id__cancel_post",
+        "operationId": "escaneos_cancelar",
         "parameters": [
           {
             "in": "path",
@@ -2773,7 +2770,7 @@
     },
     "/api/v1/scans/{trabajo_id}/errors": {
       "get": {
-        "operationId": "errores_del_escaneo_api_v1_scans__trabajo_id__errors_get",
+        "operationId": "escaneos_errores_del_escaneo",
         "parameters": [
           {
             "in": "path",
@@ -2878,7 +2875,7 @@
     "/api/v1/scans/{trabajo_id}/stream": {
       "get": {
         "description": "Progreso en vivo por Server-Sent Events.\n\nLa autorizacion se comprueba ANTES de abrir el stream: una vez\nestablecido, la conexion queda abierta y ya no hay donde devolver un\n403 que el cliente interprete correctamente.",
-        "operationId": "transmitir_progreso_api_v1_scans__trabajo_id__stream_get",
+        "operationId": "escaneos_transmitir_progreso",
         "parameters": [
           {
             "in": "path",
@@ -2952,7 +2949,7 @@
     "/health/live": {
       "get": {
         "description": "Responde si el proceso esta en pie. Sin dependencias externas.",
-        "operationId": "vivo_health_live_get",
+        "operationId": "salud_vivo",
         "responses": {
           "200": {
             "content": {
@@ -2974,7 +2971,7 @@
     "/health/ready": {
       "get": {
         "description": "Comprueba base de datos, Redis y almacenamiento, en paralelo.",
-        "operationId": "preparado_health_ready_get",
+        "operationId": "salud_preparado",
         "responses": {
           "200": {
             "content": {

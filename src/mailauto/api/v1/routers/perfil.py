@@ -55,7 +55,5 @@ async def auditoria(
     resultado = await contenedor.auditoria.listar(contexto, pagina)
     return Respuesta(
         data=[EntradaDeAuditoriaSalida.desde_dominio(e) for e in resultado.elementos],
-        meta=MetaDePagina(
-            cursor=resultado.siguiente_cursor, hay_mas=resultado.hay_mas
-        ).model_dump(),
+        meta=MetaDePagina(cursor=resultado.siguiente_cursor, hay_mas=resultado.hay_mas),
     )

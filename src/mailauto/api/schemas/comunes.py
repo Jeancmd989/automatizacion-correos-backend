@@ -27,17 +27,25 @@ from pydantic import BaseModel, ConfigDict, Field
 T = TypeVar("T")
 
 
+class MetaDePagina(BaseModel):
+    """Metadatos de paginacion. Presentes solo en los listados."""
+
+    cursor: str | None = None
+    hay_mas: bool = False
+
+
 class Respuesta(BaseModel, Generic[T]):
-    """Envoltura uniforme de exito."""
+    """
+    Envoltura uniforme de exito.
+
+    `meta` va tipado y no como diccionario abierto: con `dict[str, Any]`
+    el esquema OpenAPI lo expone como un mapa de `unknown` y cada
+    cliente tiene que estrechar el cursor a mano en cada listado.
+    """
 
     status: str = "ok"
     data: T
-    meta: dict[str, Any] | None = None
-
-
-class MetaDePagina(BaseModel):
-    cursor: str | None = None
-    hay_mas: bool = False
+    meta: MetaDePagina | None = None
 
 
 # ── Identidad ────────────────────────────────────────────────────────

@@ -94,9 +94,7 @@ async def listar(
     resultado = await contenedor.consultar_escaneo.listar(contexto, pagina)
     return Respuesta(
         data=[EscaneoSalida.desde_dominio(t) for t in resultado.elementos],
-        meta=MetaDePagina(
-            cursor=resultado.siguiente_cursor, hay_mas=resultado.hay_mas
-        ).model_dump(),
+        meta=MetaDePagina(cursor=resultado.siguiente_cursor, hay_mas=resultado.hay_mas),
     )
 
 
@@ -209,9 +207,7 @@ async def errores_del_escaneo(
     resultado = await contenedor.consultar_escaneo.listar_errores(contexto, pagina, trabajo_id)
     return Respuesta(
         data=[ErrorDeProcesamientoSalida.desde_dominio(e) for e in resultado.elementos],
-        meta=MetaDePagina(
-            cursor=resultado.siguiente_cursor, hay_mas=resultado.hay_mas
-        ).model_dump(),
+        meta=MetaDePagina(cursor=resultado.siguiente_cursor, hay_mas=resultado.hay_mas),
     )
 
 

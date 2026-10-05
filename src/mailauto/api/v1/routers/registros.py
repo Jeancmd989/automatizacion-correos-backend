@@ -58,9 +58,7 @@ async def listar_registros(
     )
     return Respuesta(
         data=[RegistroSalida.desde_dominio(r) for r in resultado.elementos],
-        meta=MetaDePagina(
-            cursor=resultado.siguiente_cursor, hay_mas=resultado.hay_mas
-        ).model_dump(),
+        meta=MetaDePagina(cursor=resultado.siguiente_cursor, hay_mas=resultado.hay_mas),
     )
 
 
@@ -83,9 +81,7 @@ async def cola_de_revision(
     resultado = await contenedor.consultar_registros.cola_de_revision(contexto, pagina)
     return Respuesta(
         data=[RegistroSalida.desde_dominio(r) for r in resultado.elementos],
-        meta=MetaDePagina(
-            cursor=resultado.siguiente_cursor, hay_mas=resultado.hay_mas
-        ).model_dump(),
+        meta=MetaDePagina(cursor=resultado.siguiente_cursor, hay_mas=resultado.hay_mas),
     )
 
 

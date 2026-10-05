@@ -28,6 +28,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.routing import APIRoute
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -45,6 +46,25 @@ from mailauto.bootstrap.settings import Settings, get_settings
 from mailauto.shared.observability.logging import configurar_logging, obtener_logger
 
 logger = obtener_logger(__name__)
+
+
+def _identificador_de_operacion(ruta: APIRoute) -> str:
+    """
+    Nombre estable y legible para cada operacion del OpenAPI.
+
+    Por defecto FastAPI genera algo como
+    `aprobar_registro_api_v1_records__registro_id__approve_post`, y de
+    ahi el generador de cliente saca
+    `useAprobarRegistroApiV1RecordsRegistroIdApprovePost`. Nadie quiere
+    escribir eso, y ademas cambia en cuanto se mueve la ruta: el
+    identificador deja de ser estable y el diff del cliente generado
+    se llena de renombrados.
+
+    Con `<tag>_<funcion>` queda `registros_aprobar_registro`, que
+    sobrevive a un cambio de ruta y produce `useRegistrosAprobarRegistro`.
+    """
+    etiqueta = ruta.tags[0] if ruta.tags else "api"
+    return f"{etiqueta}_{ruta.name}"
 
 
 def crear_app(settings: Settings | None = None) -> FastAPI:
@@ -80,6 +100,7 @@ def crear_app(settings: Settings | None = None) -> FastAPI:
             "Todas las rutas requieren un token OIDC salvo las sondas de salud."
         ),
         lifespan=ciclo_de_vida,
+        generate_unique_id_function=_identificador_de_operacion,
         # En produccion no se publica el esquema: es un mapa completo de
         # la superficie de ataque y no aporta nada a un cliente legitimo,
         # que ya tiene el cliente generado.
