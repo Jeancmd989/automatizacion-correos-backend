@@ -42,7 +42,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN groupadd --gid 10001 mailauto \
  && useradd --uid 10001 --gid mailauto --no-create-home --shell /usr/sbin/nologin mailauto \
  && apt-get update \
+ && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends libpq5 curl \
+ && /usr/local/bin/python -m pip install --no-cache-dir --upgrade 'setuptools>=84.0.0' \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

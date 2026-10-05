@@ -115,7 +115,10 @@ jobs:
         run: bandit -q -c pyproject.toml -r src
 
       - name: Dependencias vulnerables
-        run: pip-audit --strict --skip-editable
+        # Sin `--strict`: esa opcion convierte en error el haberse
+        # saltado el propio paquete local (que no esta en PyPI). Las
+        # vulnerabilidades siguen devolviendo codigo distinto de cero.
+        run: pip-audit --skip-editable
 
       # Secretos filtrados en cualquier punto del historial, no solo en
       # el ultimo commit: una clave borrada en un commit posterior sigue
