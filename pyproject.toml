@@ -1,0 +1,175 @@
+[project]
+name = "mailauto"
+version = "0.1.0"
+description = "Plataforma de automatizacion de correos: ingesta de adjuntos y extraccion de datos tributarios"
+requires-python = ">=3.12,<3.13"
+license = { text = "Proprietary" }
+
+dependencies = [
+    # Web
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "pydantic==2.10.4",
+    "pydantic-settings==2.7.0",
+    "python-multipart==0.0.20",
+    # Datos
+    "sqlalchemy[asyncio]==2.0.36",
+    "asyncpg==0.30.0",
+    "alembic==1.14.0",
+    # Cola y cache
+    "arq==0.26.3",
+    "redis==5.2.1",
+    # Seguridad
+    "cryptography==44.0.0",
+    "pyjwt[crypto]==2.10.1",
+    "authlib==1.4.0",
+    # Clientes externos
+    "httpx==0.28.1",
+    "aioboto3==13.3.0",
+    # Observabilidad
+    "structlog==24.4.0",
+    "opentelemetry-api==1.29.0",
+    "opentelemetry-sdk==1.29.0",
+    "opentelemetry-instrumentation-fastapi==0.50b0",
+    "opentelemetry-instrumentation-sqlalchemy==0.50b0",
+    "opentelemetry-exporter-otlp-proto-http==1.29.0",
+    "prometheus-client==0.21.1",
+]
+
+[project.optional-dependencies]
+# Separado de `integration` a proposito: la suite unitaria y el linting
+# son lo que corre en cada guardado y en cada push, y deben instalarse en
+# segundos. Testcontainers y schemathesis arrastran mucho mas peso y solo
+# hacen falta en el job de integracion.
+dev = [
+    "pytest==8.3.4",
+    "pytest-asyncio==0.25.0",
+    "pytest-cov==6.0.0",
+    "hypothesis==6.123.2",
+    "ruff==0.8.6",
+    "mypy==1.14.1",
+    "import-linter==2.1",
+    "bandit==1.8.0",
+    "pip-audit==2.7.3",
+]
+integration = [
+    "testcontainers[postgres,redis]==4.9.0",
+    "schemathesis==3.39.5",
+]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# ─────────────────────────────────────────────────────────────────────
+# Ruff — linting y formateo
+# ─────────────────────────────────────────────────────────────────────
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",    # pycodestyle
+    "F",         # pyflakes
+    "I",         # isort
+    "N",         # pep8-naming
+    "UP",        # pyupgrade
+    "B",         # bugbear
+    "C4",        # comprehensions
+    "DTZ",       # datetimes sin zona horaria
+    "T20",       # print / pdb olvidados
+    "SIM",       # simplificaciones
+    "TID",       # imports relativos
+    "RUF",       # reglas propias de ruff
+    "S",         # bandit
+    "ASYNC",     # errores de async
+]
+ignore = [
+    "S101",      # assert: legitimo en tests
+    "B008",      # Depends() en defaults es el idioma de FastAPI
+    # `from sqlalchemy.dialects.postgresql import UUID as PgUUID` es el
+    # idioma estandar de SQLAlchemy y el alias es imprescindible para no
+    # colisionar con `uuid.UUID`, que se usa en el mismo fichero.
+    "N811",
+    # La jerarquia de errores esta nombrada en español y ya empieza por
+    # "Error" (ErrorDeDominio, ErrorDeValidacion). Exigir el sufijo
+    # ingles produciria "ErrorDeDominioError".
+    "N818",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "S311"]
+"migrations/**" = ["E501"]
+# Los scripts de utilidad son herramientas de linea de comandos: su
+# salida es `print`, no logging estructurado.
+"scripts/**" = ["T201"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+# ─────────────────────────────────────────────────────────────────────
+# Mypy — tipado estricto
+# ─────────────────────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+disallow_any_generics = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"
+packages = ["mailauto"]
+
+[[tool.mypy.overrides]]
+module = ["aioboto3.*", "botocore.*", "arq.*", "testcontainers.*"]
+ignore_missing_imports = true
+
+# redis-py publica py.typed pero su tipado es parcial: `aclose()` figura
+# sin anotar y el cliente asincrono no es generico. Saltar su analisis
+# evita falsos positivos sobre codigo correcto, sin relajar el resto.
+[[tool.mypy.overrides]]
+module = ["redis.*"]
+follow_imports = "skip"
+ignore_missing_imports = true
+
+# ─────────────────────────────────────────────────────────────────────
+# Pytest
+# ─────────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra --strict-markers --strict-config"
+markers = [
+    "integration: requiere contenedores (PostgreSQL, Redis, MinIO)",
+    "security: verifica controles de seguridad",
+]
+
+[tool.coverage.run]
+source = ["src/mailauto"]
+branch = true
+omit = ["*/migrations/*", "*/bootstrap/app.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@abstractmethod",
+    "\\.\\.\\.",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", "migrations"]
+# B311: `random` solo se usa para el jitter del backoff, que no es un
+#       uso criptografico. Los valores que si lo son (state, PKCE,
+#       nonces, DEK) salen de `secrets` y de `os.urandom`.
+# B105/B106: bandit marca como "contraseña embebida" cualquier asignacion
+#       de cadena vacia o None a un campo cuyo nombre contenga "token".
+#       Son justo las lineas que BORRAN el token de memoria antes de
+#       devolver la entidad al llamante.
+skips = ["B311", "B105", "B106"]

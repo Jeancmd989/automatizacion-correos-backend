@@ -1,0 +1,68 @@
+# ─────────────────────────────────────────────────────────────────────
+# Imagen de la API.
+#
+# Deliberadamente SIN Tesseract, OpenCV ni poppler: el contenedor que
+# esta expuesto a Internet no debe llevar las bibliotecas nativas de
+# parseo que van a procesar ficheros de terceros. Esas viven solo en
+# Dockerfile.worker, que no recibe trafico entrante (hallazgo H12).
+#
+# Construccion en dos etapas: las herramientas de compilacion se quedan
+# en la etapa de build y no viajan a la imagen final.
+# ─────────────────────────────────────────────────────────────────────
+
+FROM python:3.12-slim-bookworm AS constructor
+
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /build
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends build-essential libpq-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml ./
+COPY src/ ./src/
+
+RUN python -m venv /opt/venv \
+ && /opt/venv/bin/pip install --upgrade pip setuptools wheel \
+ && /opt/venv/bin/pip install .
+
+
+# ─────────────────────────────────────────────────────────────────────
+FROM python:3.12-slim-bookworm AS final
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+# Usuario sin privilegios. Un proceso root dentro del contenedor
+# convierte cualquier escape en un compromiso del host.
+RUN groupadd --gid 10001 mailauto \
+ && useradd --uid 10001 --gid mailauto --no-create-home --shell /usr/sbin/nologin mailauto \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends libpq5 curl \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=constructor /opt/venv /opt/venv
+COPY --chown=mailauto:mailauto src/ ./src/
+COPY --chown=mailauto:mailauto migrations/ ./migrations/
+COPY --chown=mailauto:mailauto alembic.ini ./
+
+USER mailauto
+
+EXPOSE 8000
+
+# La sonda usa /health/live y no /health/ready: Docker reinicia el
+# contenedor cuando la sonda falla, y no se quiere reiniciar la API
+# porque PostgreSQL este temporalmente caido.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS http://localhost:8000/health/live || exit 1
+
+CMD ["uvicorn", "mailauto.bootstrap.app:crear_app", \
+     "--factory", "--host", "0.0.0.0", "--port", "8000", \
+     "--proxy-headers", "--forwarded-allow-ips", "*", \
+     "--no-server-header"]

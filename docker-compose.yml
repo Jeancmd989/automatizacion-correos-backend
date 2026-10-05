@@ -1,0 +1,177 @@
+# ─────────────────────────────────────────────────────────────────────
+# Entorno de desarrollo completo: `docker compose up`.
+#
+# Levanta API, los dos workers, PostgreSQL, Redis, MinIO y Jaeger. El
+# objetivo es que nadie tenga que instalar Tesseract ni configurar nada
+# a mano para empezar a trabajar.
+#
+# Las credenciales de este fichero son de desarrollo y solo valen aqui.
+# La configuracion real vive en .env, que no esta versionado.
+# ─────────────────────────────────────────────────────────────────────
+
+name: automatizacion-correos
+
+x-entorno-comun: &entorno-comun
+  ENVIRONMENT: development
+  DATABASE_URL: postgresql+asyncpg://mailauto_app:desarrollo@postgres:5432/mailauto
+  REDIS_URL: redis://redis:6379/0
+  STORAGE_ENDPOINT_URL: http://minio:9000
+  STORAGE_ACCESS_KEY: minioadmin
+  STORAGE_SECRET_KEY: minioadmin
+  STORAGE_BUCKET: adjuntos
+  OTEL_EXPORTER_ENDPOINT: http://jaeger:4318
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: mailauto
+      POSTGRES_USER: mailauto_owner
+      POSTGRES_PASSWORD: desarrollo
+    volumes:
+      - datos_postgres:/var/lib/postgresql/data
+      # Crea el rol de aplicacion SIN privilegios de propietario. Es
+      # imprescindible: PostgreSQL exime al propietario de las politicas
+      # RLS, asi que conectarse como `mailauto_owner` anularia todo el
+      # aislamiento multi-tenant sin ningun aviso.
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mailauto_owner -d mailauto"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - datos_redis:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - datos_minio:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"  # interfaz web de trazas
+      - "4318:4318"    # OTLP/HTTP
+
+  migraciones:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *entorno-comun
+      # Alembic si usa el rol propietario: es quien crea las tablas y
+      # define las politicas. La aplicacion nunca se conecta con el.
+      DATABASE_URL: postgresql+asyncpg://mailauto_owner:desarrollo@postgres:5432/mailauto
+    env_file: [.env]
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment: *entorno-comun
+    env_file: [.env]
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      migraciones: { condition: service_completed_successfully }
+    # Recarga en caliente: el codigo se monta y uvicorn vigila cambios.
+    volumes:
+      - ./src:/app/src:ro
+    command: >
+      uvicorn mailauto.bootstrap.app:crear_app --factory
+      --host 0.0.0.0 --port 8000 --reload --reload-dir /app/src
+
+  worker-ingesta:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    command: ["arq", "mailauto.workers.settings.WorkerDeIngesta"]
+    environment: *entorno-comun
+    env_file: [.env]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      migraciones: { condition: service_completed_successfully }
+    volumes:
+      - ./src:/app/src:ro
+    # ── Endurecimiento del contenedor que parsea ficheros ajenos ──
+    # Replica en desarrollo el perfil de produccion, para que un fallo
+    # por restricciones aparezca aqui y no al desplegar.
+    read_only: true
+    tmpfs:
+      - /tmp/mailauto:size=512m,mode=1777,noexec,nosuid,nodev
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+    # Margen para que el job en curso termine antes de recibir SIGKILL.
+    stop_grace_period: 60s
+
+  worker-cron:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    command: ["arq", "mailauto.workers.settings.WorkerDeCron"]
+    environment: *entorno-comun
+    env_file: [.env]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      migraciones: { condition: service_completed_successfully }
+    volumes:
+      - ./src:/app/src:ro
+    read_only: true
+    tmpfs:
+      - /tmp/mailauto:size=128m,mode=1777,noexec,nosuid,nodev
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    # Una sola replica: dos procesos de cron duplicarian cada purga y
+    # cada refresco programado.
+    deploy:
+      replicas: 1
+
+volumes:
+  datos_postgres:
+  datos_redis:
+  datos_minio:

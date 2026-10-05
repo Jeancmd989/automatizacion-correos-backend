@@ -1,0 +1,40 @@
+# Entorno
+.env
+.env.*
+!.env.example
+venv/
+.venv/
+.venv-*/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Herramientas
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+.tox/
+
+# Editores
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Datos locales: nunca deben llegar al repositorio
+*.sqlite
+*.db
+adjuntos_locales/
+muestras/
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.webp
+!docs/**/*.png

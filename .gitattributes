@@ -1,0 +1,17 @@
+# Normaliza los finales de linea: el repositorio guarda siempre LF y
+# cada quien trabaja con lo que su sistema use. Sin esto, un commit
+# desde Windows reescribe ficheros enteros y los diffs se vuelven
+# ilegibles.
+* text=auto eol=lf
+
+# Ficheros que deben conservar LF siempre: los consumen contenedores
+# Linux y un CRLF los rompe.
+*.sh text eol=lf
+Dockerfile* text eol=lf
+*.sql text eol=lf
+
+# Binarios: sin conversion.
+*.png binary
+*.jpg binary
+*.pdf binary
+*.ico binary
