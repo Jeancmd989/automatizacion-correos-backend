@@ -115,13 +115,13 @@ jobs:
         run: bandit -q -c pyproject.toml -r src
 
       - name: Dependencias vulnerables
-        run: pip-audit --strict
+        run: pip-audit --strict --skip-editable
 
       # Secretos filtrados en cualquier punto del historial, no solo en
       # el ultimo commit: una clave borrada en un commit posterior sigue
       # estando comprometida y recuperable.
       - name: Buscar secretos en el historial
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -195,7 +195,7 @@ jobs:
       # El worker es el contenedor que abre ficheros de terceros, asi que
       # una CVE en sus bibliotecas nativas importa mas que en ningun otro.
       - name: Escanear imagen de worker
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: mailauto-worker:ci
           format: table
@@ -204,7 +204,7 @@ jobs:
           severity: CRITICAL,HIGH
 
       - name: Escanear imagen de API
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: mailauto-api:ci
           format: table
@@ -213,7 +213,7 @@ jobs:
           severity: CRITICAL,HIGH
 
       - name: Generar SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@v0.24.3
         with:
           image: mailauto-api:ci
           format: spdx-json

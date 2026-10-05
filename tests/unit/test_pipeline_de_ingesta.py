@@ -408,7 +408,7 @@ async def test_no_reejecuta_un_trabajo_ya_terminado() -> None:
     Segunda mitad de la idempotencia: una reentrega de la cola sobre un
     trabajo terminal se ignora en lugar de volver a procesarlo todo.
     """
-    pipeline, repo, almacen, _, trabajo = _montar({"m1": [("a.pdf", pdf_valido())]})
+    pipeline, _, almacen, _, trabajo = _montar({"m1": [("a.pdf", pdf_valido())]})
     trabajo.marcar_en_ejecucion()
     trabajo.completar()
 

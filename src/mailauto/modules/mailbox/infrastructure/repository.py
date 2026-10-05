@@ -105,10 +105,15 @@ class RepositorioDeBuzonesPostgres(RepositorioDeBuzones):
 
     async def eliminar(self, ctx: TenantContext, conexion_id: UUID) -> bool:
         async with self._sesiones.sesion_de_tenant(ctx) as sesion:
-            resultado = await sesion.execute(
-                delete(ConexionDeBuzonORM).where(ConexionDeBuzonORM.id == conexion_id)
+            # RETURNING en lugar de `rowcount`: deja tipado el resultado
+            # y hace explicito en la propia sentencia que interesa saber
+            # si existia la fila.
+            eliminado = await sesion.scalar(
+                delete(ConexionDeBuzonORM)
+                .where(ConexionDeBuzonORM.id == conexion_id)
+                .returning(ConexionDeBuzonORM.id)
             )
-            return bool(resultado.rowcount)
+            return eliminado is not None
 
     # ── Lectura ──────────────────────────────────────────────────────
 

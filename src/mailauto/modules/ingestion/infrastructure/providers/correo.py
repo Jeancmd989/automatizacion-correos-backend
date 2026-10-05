@@ -447,7 +447,7 @@ class ProveedorMicrosoftGraph(ProveedorDeCorreoHttp):
     ) -> AsyncIterator[bytes]:
         # Graph sirve los bytes en bruto en `/$value`: se puede cortar
         # trozo a trozo sin factor de correccion.
-        url = f"{self._BASE}/messages/{id_del_mensaje}" f"/attachments/{id_del_adjunto}/$value"
+        url = f"{self._BASE}/messages/{id_del_mensaje}/attachments/{id_del_adjunto}/$value"
         acumulado = 0
 
         async with (
