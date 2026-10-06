@@ -17,6 +17,7 @@ Por que importa la cardinalidad
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -206,3 +207,43 @@ def test_el_registro_no_arrastra_las_metricas_del_proceso() -> None:
     cuerpo = _cuerpo_de_metricas(_cliente())
     assert "python_gc_objects_collected_total" not in cuerpo
     assert "process_virtual_memory_bytes" not in cuerpo
+
+
+# ── Que ninguna metrica quede sin alimentar ──────────────────────────
+
+
+def test_toda_metrica_declarada_se_incrementa_en_algun_sitio() -> None:
+    """
+    Una metrica definida que nadie alimenta es peor que no tenerla: la
+    alerta que la vigila queda en verde para siempre y nadie se entera.
+    Ocurrio con `respuestas_de_proveedor`, que tenia dos alertas escritas
+    y ningun punto de codigo que la tocara.
+
+    La comprobacion es textual sobre el arbol de fuentes: un contador se
+    usa siempre como `metricas.<nombre>.labels(...)` o
+    `metricas.<nombre>.inc()`, y buscar la referencia es suficiente para
+    distinguir "declarada" de "declarada y usada".
+    """
+    import inspect
+
+    from prometheus_client.metrics import MetricWrapperBase
+
+    raiz = Path(__file__).resolve().parents[2] / "src" / "mailauto"
+    fuentes = "\n".join(
+        fichero.read_text(encoding="utf-8")
+        for fichero in raiz.rglob("*.py")
+        if fichero.name != "metricas.py"
+    )
+
+    declaradas = [
+        nombre
+        for nombre, valor in inspect.getmembers(metricas)
+        if isinstance(valor, MetricWrapperBase)
+    ]
+    assert declaradas, "No se detecto ninguna metrica: el test no comprobaria nada"
+
+    sin_alimentar = sorted(n for n in declaradas if f"metricas.{n}" not in fuentes)
+    assert not sin_alimentar, (
+        f"Metricas declaradas que nadie incrementa: {sin_alimentar}. "
+        "Cualquier alerta que las vigile nunca se disparara."
+    )

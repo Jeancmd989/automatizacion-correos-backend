@@ -95,22 +95,3 @@ class CuotasEnRedis(ControlDeCuotas):
             return True
 
         return int(actual) <= maximo
-
-
-class CuotasSinLimite(ControlDeCuotas):
-    """
-    Implementacion que nunca limita.
-
-    La usan los tests que no estan comprobando cuotas. Existe para que no
-    tengan que escribir un doble cada uno.
-    """
-
-    async def consumir(
-        self,
-        *,
-        recurso: str,
-        tenant_id: UUID,
-        maximo: int,
-        ventana_segundos: int,
-    ) -> bool:
-        return True

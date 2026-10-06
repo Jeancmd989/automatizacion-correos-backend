@@ -46,6 +46,7 @@ from mailauto.modules.mailbox.domain.entities import (
 )
 from mailauto.modules.mailbox.domain.ports import ProveedorOAuth
 from mailauto.shared.errors import CredencialesRevocadas, ErrorDeProveedor
+from mailauto.shared.observability import metricas
 from mailauto.shared.types import ahora_utc
 
 TIMEOUT_SEGUNDOS = 15.0
@@ -169,7 +170,20 @@ class ProveedorOAuthBase(ProveedorOAuth):
                     headers={"Accept": "application/json"},
                 )
         except httpx.HTTPError as exc:
+            # Un fallo de transporte no tiene codigo: se cuenta como `error`
+            # para que no desaparezca de la tasa por ser inclasificable.
+            metricas.respuestas_de_proveedor.labels(
+                proveedor=self.nombre.value, clase="error"
+            ).inc()
             raise ErrorDeProveedor(proveedor=self.nombre.value, reintentable=True) from exc
+
+        # Se cuenta antes de interpretar el resultado: asi la metrica refleja
+        # lo que el proveedor contesto y no lo que este codigo decide hacer
+        # con ello.
+        metricas.respuestas_de_proveedor.labels(
+            proveedor=self.nombre.value,
+            clase=metricas.clase_de_estado(respuesta.status_code),
+        ).inc()
 
         if respuesta.status_code == httpx.codes.BAD_REQUEST:
             cuerpo = self._json_seguro(respuesta)
