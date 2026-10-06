@@ -14,6 +14,14 @@ name: automatizacion-correos
 
 x-entorno-comun: &entorno-comun
   ENVIRONMENT: development
+  # Imprescindible para que la recarga en caliente sirva de algo.
+  #
+  # La imagen instala el paquete con `pip install .`, asi que `import
+  # mailauto` resuelve a site-packages. Sin esta variable, el codigo
+  # montado en /app/src no se importa nunca: se edita un fichero, uvicorn
+  # anuncia la recarga y sigue sirviendo exactamente lo que habia en la
+  # imagen. Es el peor tipo de fallo de entorno, porque parece funcionar.
+  PYTHONPATH: /app/src
   DATABASE_URL: postgresql+asyncpg://mailauto_app:desarrollo@postgres:5432/mailauto
   REDIS_URL: redis://redis:6379/0
   STORAGE_ENDPOINT_URL: http://almacen:4566

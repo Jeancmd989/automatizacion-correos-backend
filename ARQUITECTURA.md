@@ -111,6 +111,7 @@ El sistema de referencia resuelve un flujo concreto y válido:
 | 017 | **Alembic usa el mismo driver asíncrono que la aplicación** (`asyncpg` + `connection.run_sync`) | Reescribir la URL a `postgresql://` y usar un driver síncrono | SQLAlchemy 2.1 resuelve `postgresql://` a `psycopg` 3, que no es dependencia del proyecto: las migraciones no arrancaban. Un segundo driver además haría que un problema de conexión o de TLS se comportara distinto en las migraciones que en la aplicación |
 | 018 | **El entorno de desarrollo se ajusta al código, no al revés**: el almacén exige `ServerSideEncryption` en cada `PutObject` sin excepciones, y soportarlo es un requisito del servicio de desarrollo y de CI | Hacer configurable el cifrado del almacén | Una opción para desactivar el cifrado acaba puesta en producción. Fue además el criterio que descartó Garage al sustituir MinIO: sin SSE, el emulador no sirve |
 | 019 | **Los privilegios `UPDATE` y `DELETE` sobre `audit_log` se retiran al rol de aplicación** | Confiar solo en la ausencia de política RLS para esas operaciones | Sin política, PostgreSQL no da error: filtra todas las filas y la sentencia termina con éxito y cero filas afectadas, así que un intento de manipular la bitácora no deja rastro. Retirar el privilegio lo convierte en un error explícito, visible en el log del servidor e independiente de que RLS siga activo |
+| 020 | **Dos controles de volumen separados:** un cortafuegos por minuto en el middleware (por IP, antes de autenticar) y **cuotas de negocio por tenant como dependencia de FastAPI** (después de autenticar) | Un único limitador en el middleware con límites por prefijo | Una cuota pertenece al tenant. Contarla en el middleware obliga a contarla por IP, porque el sujeto autenticado lo resuelve una dependencia que corre después de todo el middleware. Con una ventana de una hora eso era una denegación de servicio sin credenciales: veintiuna peticiones anónimas a `/scans` dejaban sin escaneos durante una hora a todos los que compartieran salida a internet. Lo detectó una prueba de carga |
 
 ---
 
@@ -678,8 +679,8 @@ de tablas, trazas de excepción, ni registros de otro tenant — esto último ve
 | Integración ✅ | pytest contra los servicios de `docker compose` (PostgreSQL, Redis, LocalStack) | Migraciones aplicadas, **RLS verificado sobre la base real**, privilegios del rol de aplicación, consumo atómico del `state` OAuth, ciclo completo del almacén de adjuntos | 36 tests |
 | Contrato | Schemathesis sobre el OpenAPI | Fuzzing de todos los endpoints contra su esquema | sin 500 inesperados |
 | Seguridad | Suite dedicada | Acceso cruzado entre tenants, escalada de rol, JWT manipulado (`alg: none`, firma inválida, `aud` erróneo), path traversal en el nombre del adjunto, PDF bomb, archivo con magic bytes falsos | todos deben recibir un rechazo |
-| E2E | Playwright | Login → vincular buzón (mock) → escanear → revisar → exportar | flujos críticos |
-| Carga | k6 | 50 escaneos concurrentes; medición de p95 y profundidad de cola | p95 < 300 ms en lecturas |
+| E2E ✅ | Playwright | Acceso al panel, escaneo con progreso en vivo por SSE, paginación por cursor, cola de revisión, exportación asíncrona y accesibilidad | 43 tests |
+| Carga 🔄 | k6 | Escenario de humo ✅ (salud, autenticación exigida, limitador bajo ráfaga). Escenarios autenticados escritos y pendientes de ejecutar en staging: lectura sostenida y 50 escaneos concurrentes | p95 < 300 ms en lecturas |
 | Estático | ruff, mypy strict, bandit, semgrep, import-linter, eslint, tsc | Todo el código | sin hallazgos nuevos |
 
 Fixtures con datos sintéticos. **Ningún documento tributario real en el repositorio.**
@@ -771,7 +772,7 @@ expuesto a Internet todas las bibliotecas nativas de parseo.
 | **4 — Extracción** ✅ | Cadena de estrategias, preprocesamiento OpenCV, perfil SUNAT, objetos de valor con validación, confianza por campo | Precisión medida sobre un set sintético etiquetado |
 | **5 — Revisión y reportes** ✅ | Cola de revisión humana, corrección y aprobación, export Excel/CSV asíncrono, estadísticas | Flujo completo extremo a extremo |
 | **6 — Frontend** | Design system, features, cliente generado, BFF, SSE, a11y, tests | Playwright en verde sobre los flujos críticos |
-| **7 — Endurecimiento** 🔄 | Tests de integración contra PostgreSQL, Redis y un S3 real ✅ · rate limiting, cuotas, circuit breakers, aislamiento del worker y escaneo de imágenes ✅ (fases 0–3) · pendientes: pruebas de carga con k6 y E2E con Playwright | Informe de seguridad y de carga |
+| **7 — Endurecimiento** 🔄 | Tests de integración contra PostgreSQL, Redis y un S3 real ✅ · E2E con Playwright ✅ · cuotas por tenant separadas del cortafuegos de avalanchas ✅ · escenario de humo de carga ✅ · pendiente: ejecutar los escenarios de carga autenticados en staging | Informe de seguridad y de carga |
 | **8 — Operación** | Runbooks, dashboards, alertas, manual técnico y de usuario, despliegue a producción | Sistema operando y documentado |
 
 ---

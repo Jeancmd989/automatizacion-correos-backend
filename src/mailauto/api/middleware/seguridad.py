@@ -120,14 +120,27 @@ class MiddlewareDeCabecerasDeSeguridad(BaseHTTPMiddleware):
 
 class MiddlewareDeRateLimit(BaseHTTPMiddleware):
     """
-    Limitador por ventana fija sobre Redis.
+    Cortafuegos contra avalanchas, por ventana fija sobre Redis.
 
-    Se identifica por usuario autenticado cuando se conoce, y por IP en
-    caso contrario. La clave incluye la ventana temporal, de modo que el
-    propio TTL limpia los contadores sin necesidad de barrido.
+    Corre antes de autenticar, que es el orden correcto: no tiene sentido
+    verificar la firma de un token de trafico que se va a rechazar. La
+    consecuencia es que solo puede identificar al cliente por su direccion
+    IP, y eso delimita para que sirve.
+
+    **No es el sitio de las cuotas de negocio.** Una cuota pertenece al
+    tenant, y contarla aqui por IP significa que cualquiera sin
+    credenciales la agota para todos los que comparten salida a internet:
+    con veintiuna peticiones anonimas se dejaba una oficina entera sin
+    poder lanzar escaneos durante una hora. Las cuotas se aplican con
+    `limita_por_tenant`, que corre despues de resolver la identidad.
+
+    La clave incluye la ventana temporal, de modo que el propio TTL limpia
+    los contadores sin necesidad de barrido.
     """
 
     _RUTAS_EXENTAS: Final = frozenset({"/health/live", "/health/ready", "/metrics"})
+
+    _VENTANA_SEGUNDOS: Final = 60
 
     def __init__(
         self,
@@ -135,7 +148,6 @@ class MiddlewareDeRateLimit(BaseHTTPMiddleware):
         *,
         redis: Redis,
         limite_por_minuto: int,
-        limites_por_prefijo: dict[str, tuple[int, int]] | None = None,
     ) -> None:
         super().__init__(app)  # type: ignore[arg-type]
         # Opcional porque la subclase perezosa de `bootstrap/app.py` se
@@ -143,8 +155,6 @@ class MiddlewareDeRateLimit(BaseHTTPMiddleware):
         # resuelve el cliente en la primera peticion.
         self._redis: Redis | None = redis
         self._limite = limite_por_minuto
-        # prefijo -> (maximo, ventana_en_segundos)
-        self._especificos = limites_por_prefijo or {}
 
     async def dispatch(self, request: Request, call_next: Siguiente) -> Response:
         if request.url.path in self._RUTAS_EXENTAS or self._redis is None:
@@ -154,7 +164,7 @@ class MiddlewareDeRateLimit(BaseHTTPMiddleware):
             # legitimo por un detalle de arranque.
             return await call_next(request)
 
-        limite, ventana = self._resolver_limite(request.url.path)
+        ventana = self._VENTANA_SEGUNDOS
         identidad = self._identificar(request)
         clave = f"rl:{identidad}:{request.url.path}:{int(time.time() // ventana)}"
 
@@ -171,8 +181,8 @@ class MiddlewareDeRateLimit(BaseHTTPMiddleware):
             logger.error("rate_limit_no_disponible")
             return await call_next(request)
 
-        if int(actual) > limite:
-            logger.warning("rate_limit_excedido", identidad=identidad, limite=limite)
+        if int(actual) > self._limite:
+            logger.warning("rate_limit_excedido", identidad=identidad, limite=self._limite)
             return JSONResponse(
                 status_code=429,
                 content={
@@ -186,24 +196,18 @@ class MiddlewareDeRateLimit(BaseHTTPMiddleware):
 
         return await call_next(request)
 
-    def _resolver_limite(self, ruta: str) -> tuple[int, int]:
-        for prefijo, (maximo, ventana) in self._especificos.items():
-            if ruta.startswith(prefijo):
-                return maximo, ventana
-        return self._limite, 60
-
     @staticmethod
     def _identificar(request: Request) -> str:
         """
-        Prefiere el sujeto autenticado sobre la IP.
+        Identifica por IP, y por la cabecera de tenant cuando viene.
 
-        Limitar solo por IP castiga a oficinas detras de un NAT compartido
-        y no detiene a quien rota direcciones.
+        No se intenta usar el sujeto autenticado: lo resuelve una
+        dependencia de FastAPI, que se ejecuta despues de todo el
+        middleware, asi que aqui nunca esta disponible. Incluir la
+        cabecera de tenant reparte algo el presupuesto entre los clientes
+        que comparten una salida a internet, sin fiarse de ella para nada
+        mas: es un valor que el llamante elige.
         """
-        contexto = getattr(request.state, "tenant_context", None)
-        if contexto is not None:
-            return f"u:{contexto.user_id}"
-
         tenant = request.headers.get(_CABECERA_TENANT, "")
         cliente = request.client.host if request.client else "desconocido"
         return f"ip:{cliente}:{tenant[:36]}"

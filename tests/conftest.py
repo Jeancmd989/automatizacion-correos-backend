@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
+from typing import Any
 from uuid import UUID
 
 import pytest
@@ -54,6 +55,32 @@ def _entorno_de_pruebas(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setenv("STORAGE_ACCESS_KEY", "pruebas")
     monkeypatch.setenv("STORAGE_SECRET_KEY", "pruebas")
     yield
+
+
+def ajustes_de_pruebas(**extra: Any) -> Settings:  # noqa: ANN401 - configuracion heterogenea
+    """
+    Configuracion valida para los tests que montan la aplicacion.
+
+    Se construye con el constructor y no con `model_copy`: este ultimo
+    salta la validacion y dejaria `environment` como un `str` en lugar de
+    un `Entorno`, con lo que el test pasaria comprobando algo distinto de
+    lo que el codigo hace en produccion.
+    """
+    base: dict[str, Any] = {
+        "environment": "development",
+        "database_url": "postgresql+asyncpg://u:p@localhost:5432/pruebas",
+        "redis_url": "redis://localhost:6379/1",
+        "oidc_issuer": "https://pruebas.ejemplo.com/",
+        "oidc_audience": "https://api.ejemplo.com",
+        "master_key_b64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "google_client_id": "id",
+        "google_client_secret": "secreto",
+        "storage_access_key": "k",
+        "storage_secret_key": "s",
+        "cors_origins": ["http://localhost:3000"],
+        "oauth_redirect_uris": ["http://localhost:3000/oauth/callback"],
+    }
+    return Settings(**{**base, **extra})
 
 
 @pytest.fixture

@@ -141,16 +141,15 @@ def _montar_middlewares(app: FastAPI, ajustes: Settings) -> None:
     # El rate limit necesita Redis, que vive en el contenedor y solo
     # existe tras el lifespan. Se resuelve con un envoltorio perezoso que
     # toma el cliente de `app.state` en la primera peticion.
+    # Limite unico y por minuto: es un cortafuegos contra avalanchas, no
+    # una cuota. Las cuotas de los endpoints caros (escaneos y
+    # vinculaciones OAuth) se aplican por tenant con `limita_por_tenant`,
+    # que corre despues de autenticar; aqui solo se puede contar por IP, y
+    # una cuota horaria contada por IP antes de autenticar la agota
+    # cualquiera sin credenciales para todo el que comparta esa salida.
     app.add_middleware(
         _RateLimitPerezoso,
         limite_por_minuto=ajustes.rate_limit_default_per_minute,
-        limites_por_prefijo={
-            # Los endpoints que lanzan trabajo o inician OAuth son los
-            # mas caros y los mas interesantes de abusar: limite propio.
-            "/api/v1/scans": (ajustes.rate_limit_scan_per_hour, 3600),
-            "/api/v1/mailboxes/authorize": (ajustes.rate_limit_oauth_per_hour, 3600),
-            "/api/v1/mailboxes/callback": (ajustes.rate_limit_oauth_per_hour, 3600),
-        },
     )
 
     app.add_middleware(MiddlewareDeCorrelacion)
@@ -173,21 +172,10 @@ class _RateLimitPerezoso(MiddlewareDeRateLimit):
     veces) duplicaria el pool sin necesidad.
     """
 
-    def __init__(
-        self,
-        app: object,
-        *,
-        limite_por_minuto: int,
-        limites_por_prefijo: dict[str, tuple[int, int]],
-    ) -> None:
+    def __init__(self, app: object, *, limite_por_minuto: int) -> None:
         # Arranca sin cliente; `dispatch` lo toma de app.state en la
         # primera peticion, cuando el lifespan ya abrio las conexiones.
-        super().__init__(
-            app,
-            redis=None,
-            limite_por_minuto=limite_por_minuto,
-            limites_por_prefijo=limites_por_prefijo,
-        )
+        super().__init__(app, redis=None, limite_por_minuto=limite_por_minuto)
 
     async def dispatch(self, request: Request, call_next: Siguiente) -> Response:
         if self._redis is None:

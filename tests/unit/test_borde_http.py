@@ -22,30 +22,7 @@ from fastapi.testclient import TestClient
 from mailauto.bootstrap.app import crear_app
 from mailauto.bootstrap.settings import Settings
 from mailauto.shared.errors import TokenInvalido
-
-
-def _ajustes(**extra: Any) -> Settings:  # noqa: ANN401 - campos de configuracion heterogeneos
-    """
-    Configuracion valida construida por el constructor, no por
-    `model_copy`: este ultimo salta la validacion y dejaria `environment`
-    como un `str` en lugar de un `Entorno`, con lo que el test pasaria
-    comprobando algo distinto de lo que el codigo hace en produccion.
-    """
-    base: dict[str, Any] = {
-        "environment": "development",
-        "database_url": "postgresql+asyncpg://u:p@localhost:5432/pruebas",
-        "redis_url": "redis://localhost:6379/1",
-        "oidc_issuer": "https://pruebas.ejemplo.com/",
-        "oidc_audience": "https://api.ejemplo.com",
-        "master_key_b64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-        "google_client_id": "id",
-        "google_client_secret": "secreto",
-        "storage_access_key": "k",
-        "storage_secret_key": "s",
-        "cors_origins": ["http://localhost:3000"],
-        "oauth_redirect_uris": ["http://localhost:3000/oauth/callback"],
-    }
-    return Settings(**{**base, **extra})
+from tests.conftest import ajustes_de_pruebas
 
 
 def _ajustes_de_produccion(**extra: Any) -> Settings:  # noqa: ANN401 - campos de configuracion heterogeneos
@@ -56,7 +33,7 @@ def _ajustes_de_produccion(**extra: Any) -> Settings:  # noqa: ANN401 - campos d
         "cors_origins": ["https://app.ejemplo.com"],
         "oauth_redirect_uris": ["https://app.ejemplo.com/oauth/callback"],
     }
-    return _ajustes(**{**propios, **extra})
+    return ajustes_de_pruebas(**{**propios, **extra})
 
 
 class _VerificadorQueRechaza:
@@ -78,7 +55,7 @@ def _cliente_de(ajustes: Settings) -> TestClient:
 
 @pytest.fixture
 def cliente() -> TestClient:
-    return _cliente_de(_ajustes())
+    return _cliente_de(ajustes_de_pruebas())
 
 
 # ── Montaje ──────────────────────────────────────────────────────────
@@ -87,7 +64,7 @@ def cliente() -> TestClient:
 def test_la_aplicacion_monta_todas_las_rutas_esperadas() -> None:
     rutas = {
         f"{metodo} {ruta}"
-        for ruta, operaciones in crear_app(_ajustes()).openapi()["paths"].items()
+        for ruta, operaciones in crear_app(ajustes_de_pruebas()).openapi()["paths"].items()
         for metodo in operaciones
     }
     esperadas = {

@@ -38,6 +38,7 @@ from mailauto.api.deps import (
     ContenedorDep,
     ContextoDep,
     PaginacionDep,
+    limita_por_tenant,
     obtener_clave_de_idempotencia,
 )
 from mailauto.api.schemas.comunes import (
@@ -55,7 +56,21 @@ router = APIRouter(prefix="/scans", tags=["escaneos"])
 _SEGUNDOS_ENTRE_LATIDOS = 15.0
 
 
-@router.post("", response_model=Respuesta[EscaneoSalida], status_code=status.HTTP_202_ACCEPTED)
+# La cuota se declara en la ruta y no dentro del caso de uso porque es
+# una politica del borde HTTP: un escaneo lanzado por el worker de cron no
+# debe consumirla.
+@router.post(
+    "",
+    response_model=Respuesta[EscaneoSalida],
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[
+        limita_por_tenant(
+            "escaneos",
+            maximo_de=lambda ajustes: ajustes.rate_limit_scan_per_hour,
+            ventana_segundos=3600,
+        )
+    ],
+)
 async def iniciar(
     entrada: IniciarEscaneoEntrada,
     contexto: ContextoDep,

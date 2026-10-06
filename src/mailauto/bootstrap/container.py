@@ -126,6 +126,7 @@ from mailauto.modules.reporting.infrastructure.repository import (
     RepositorioDeExportacionesPostgres,
 )
 from mailauto.shared.crypto.envelope import ClaveMaestraLocal, ServicioDeCifrado
+from mailauto.shared.cuotas import ControlDeCuotas, CuotasEnRedis
 from mailauto.shared.db.session import FabricaDeSesiones, crear_engine
 from mailauto.shared.security.jwt_verifier import VerificadorDeTokens
 
@@ -141,6 +142,7 @@ class Contenedor:
     almacen: AlmacenDeObjetosS3
     verificador: VerificadorDeTokens
     auditoria: RegistroDeAuditoria
+    cuotas: ControlDeCuotas
 
     # Casos de uso
     resolver_identidad: ResolverIdentidad
@@ -283,6 +285,7 @@ async def construir_contenedor(settings: Settings) -> Contenedor:
         almacen=almacen,
         verificador=verificador,
         auditoria=auditoria,
+        cuotas=CuotasEnRedis(redis),
         resolver_identidad=ResolverIdentidad(repo_identidad),
         iniciar_vinculacion=IniciarVinculacion(
             proveedores_oauth,

@@ -23,10 +23,11 @@ Implementadas las **fases 0 a 5** y los tests de integración de la **fase 7** d
 | 5 | Cola de revisión humana, reportes Excel/CSV asíncronos | ✅ |
 | 6 | Frontend (interfaz de operación) | pendiente |
 | 7 | Tests de integración contra PostgreSQL, Redis y S3 reales | ✅ |
-| 7 | Pruebas de carga y E2E | pendiente |
+| 7 | Cuotas por tenant separadas del limitador de avalanchas | ✅ |
+| 7 | Pruebas de carga (escenarios autenticados pendientes de staging) | 🔄 |
 | 8 | Operación: runbooks, dashboards, despliegue | pendiente |
 
-**Verificación actual:** 372 tests en verde (336 sin infraestructura + 36 de
+**Verificación actual:** 381 tests en verde (345 sin infraestructura + 36 de
 integración), 6/6 contratos de arquitectura, `mypy --strict` sin hallazgos, `ruff`,
 `bandit` y `pip-audit` limpios. Cobertura: dominio 92–100 %, capa de aplicación
 73–100 %.
@@ -46,6 +47,18 @@ defectos que ninguna comprobación estática podía detectar:
 - La imagen `minio/minio` había desaparecido de Docker Hub, así que un clon reciente no
   podía ni levantar el entorno. El almacén de desarrollo y de CI pasa a ser LocalStack,
   que es pública, está mantenida e implementa tanto SSE-S3 como el presignado v4.
+
+Y las [pruebas de carga](pruebas-de-carga/) destaparon dos más:
+
+- **Denegación de servicio sin credenciales.** La cuota horaria de escaneos la aplicaba
+  el middleware de rate limit, que corre antes de autenticar y por tanto solo puede
+  contar por dirección IP: veintiuna peticiones anónimas dejaban sin escaneos durante
+  una hora a todos los que compartieran salida a internet. Las cuotas se aplican ahora
+  por tenant y después de autenticar.
+- **La recarga en caliente no recargaba nada.** La imagen instala el paquete, así que
+  `import mailauto` resolvía a `site-packages` y el código montado en `/app/src` no se
+  importaba nunca: se editaba un fichero, uvicorn anunciaba la recarga y seguía sirviendo
+  lo que había en la imagen.
 
 ---
 
@@ -142,6 +155,13 @@ pytest -q -m integration
 Se saltan solos, con un aviso que explica qué levantar, si no encuentran nada
 escuchando. En CI eso sería un trabajo en verde sin haber comprobado nada, así que allí
 un salto se trata como fallo.
+
+Las pruebas de carga van en [`pruebas-de-carga/`](pruebas-de-carga/) con su propia
+documentación. El escenario de humo no necesita token y corre contra la pila local:
+
+```bash
+docker run --rm --network automatizacion-correos_default -v "$PWD/pruebas-de-carga:/carga:ro" -e BASE_URL=http://api:8000 -e ESCENARIO=humo grafana/k6:latest run /carga/carga.js
+```
 
 Las URLs de conexión se leen de `TEST_DATABASE_URL`, `TEST_DATABASE_URL_OWNER`,
 `TEST_REDIS_URL` y `TEST_STORAGE_ENDPOINT_URL`, y por defecto apuntan a los puertos del

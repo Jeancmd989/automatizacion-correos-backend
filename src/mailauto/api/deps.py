@@ -13,21 +13,31 @@ Dependencias
     FastAPI y el `Contenedor`. No importa infraestructura directamente
     (contrato `api-sin-infraestructura`): todo llega ya construido.
 
-Decision de diseño
-    `obtener_contexto` tambien deja el contexto en `request.state`, porque
-    el middleware de rate limit se ejecuta antes que las dependencias y
-    necesita identificar al usuario para contar por sujeto y no por IP.
+Decisiones de diseño
+    1. `obtener_contexto` deja el contexto en `request.state` para que el
+       middleware de correlacion pueda enriquecer el log de la peticion
+       una vez resuelta. No sirve para el rate limit: ese middleware se
+       ejecuta ANTES de las dependencias y nunca vera este valor.
+
+    2. Las cuotas de negocio —escaneos por hora, vinculaciones por hora—
+       se aplican aqui con `limita_por_tenant` y no en el middleware. El
+       middleware solo puede identificar por IP, y contar una cuota de
+       tenant por IP antes de autenticar permite que cualquiera sin
+       credenciales agote la cuota de todos los que comparten salida a
+       internet. Ver `mailauto.shared.cuotas`.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, Header, Query, Request
+from fastapi import Depends, Header, Query, Request, params
 
 from mailauto.bootstrap.container import Contenedor
-from mailauto.shared.errors import ErrorDeAutenticacion, ErrorDeValidacion
+from mailauto.bootstrap.settings import Settings
+from mailauto.shared.errors import ErrorDeAutenticacion, ErrorDeValidacion, LimiteExcedido
 from mailauto.shared.pagination import LIMITE_MAXIMO, LIMITE_POR_DEFECTO, SolicitudDePagina
 from mailauto.shared.security.context import Permiso, TenantContext
 
@@ -84,6 +94,44 @@ def exige(permiso: Permiso):  # type: ignore[no-untyped-def]
         return contexto
 
     return verificar
+
+
+def limita_por_tenant(
+    recurso: str,
+    *,
+    maximo_de: Callable[[Settings], int],
+    ventana_segundos: int,
+) -> params.Depends:
+    """
+    Dependencia de cuota por tenant para una operacion concreta.
+
+    Se declara con un lector de la configuracion (`maximo_de`) en lugar
+    de con un numero: el limite se resuelve en cada peticion a partir de
+    los ajustes del contenedor, de modo que el valor efectivo es el del
+    despliegue y no el que hubiera al importar el modulo.
+
+    Corre despues de `obtener_contexto`, asi que el consumo se atribuye al
+    tenant autenticado. Una peticion sin credenciales valida se rechaza
+    antes de llegar aqui y no gasta cuota de nadie.
+    """
+
+    async def verificar(contexto: ContextoDep, contenedor: ContenedorDep) -> None:
+        maximo = maximo_de(contenedor.settings)
+        permitido = await contenedor.cuotas.consumir(
+            recurso=recurso,
+            tenant_id=contexto.tenant_id,
+            maximo=maximo,
+            ventana_segundos=ventana_segundos,
+        )
+        if not permitido:
+            raise LimiteExcedido(
+                reintentar_en_segundos=ventana_segundos,
+                contexto={"recurso": recurso, "maximo": maximo},
+            )
+
+    # Se construye la clase y no el ayudante `Depends()`, que devuelve
+    # `Any` y dejaria la firma de esta funcion sin verificar.
+    return params.Depends(dependency=verificar)
 
 
 def obtener_paginacion(

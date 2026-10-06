@@ -22,7 +22,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Response, status
 
-from mailauto.api.deps import ContenedorDep, ContextoDep
+from mailauto.api.deps import ContenedorDep, ContextoDep, limita_por_tenant
 from mailauto.api.schemas.comunes import (
     BuzonSalida,
     CallbackEntrada,
@@ -42,7 +42,19 @@ async def listar(contexto: ContextoDep, contenedor: ContenedorDep) -> Respuesta[
     return Respuesta(data=[BuzonSalida.desde_dominio(c) for c in conexiones])
 
 
-@router.post("/authorize", response_model=Respuesta[UrlDeAutorizacionSalida])
+# Iniciar y completar una vinculacion comparten cuota: ambas salen al
+# proveedor OAuth y son las dos mitades de la misma operacion.
+@router.post(
+    "/authorize",
+    response_model=Respuesta[UrlDeAutorizacionSalida],
+    dependencies=[
+        limita_por_tenant(
+            "vinculaciones",
+            maximo_de=lambda ajustes: ajustes.rate_limit_oauth_per_hour,
+            ventana_segundos=3600,
+        )
+    ],
+)
 async def autorizar(
     entrada: IniciarVinculacionEntrada,
     contexto: ContextoDep,
@@ -58,7 +70,16 @@ async def autorizar(
 
 
 @router.post(
-    "/callback", response_model=Respuesta[BuzonSalida], status_code=status.HTTP_201_CREATED
+    "/callback",
+    response_model=Respuesta[BuzonSalida],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[
+        limita_por_tenant(
+            "vinculaciones",
+            maximo_de=lambda ajustes: ajustes.rate_limit_oauth_per_hour,
+            ventana_segundos=3600,
+        )
+    ],
 )
 async def callback(
     entrada: CallbackEntrada,
