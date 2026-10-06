@@ -107,6 +107,10 @@ El sistema de referencia resuelve un flujo concreto y válido:
 | 013 | **Auth0 detrás de un `IdentityProviderPort`** | Keycloak autoalojado, JWT propio | Se conserva lo que ya funciona, sin acoplar el dominio al proveedor |
 | 014 | **Dos repositorios separados** (backend y frontend), como en el sistema de referencia | Monorepo | Despliegue y ciclo de vida independientes, y continuidad con la organización actual del equipo. El coste —no poder cambiar la API y su cliente en el mismo commit— se compensa con el ADR 015 |
 | 015 | **`openapi.json` versionado como contrato compartido** entre ambos repositorios | Paquete npm publicado; sincronización manual | Sin monorepo, el cliente TypeScript no puede regenerarse en el mismo commit que cambia la API. El CI del backend verifica que el esquema versionado está al día (`scripts/exportar_openapi.py`) y el del frontend regenera su cliente a partir de él y falla si hay diferencias. Mismo efecto que el monorepo —deriva de contrato imposible— con un paso más de pipeline y sin publicar un paquete |
+| 016 | Las políticas RLS leen el tenant con **`nullif(current_setting('app.current_tenant', true), '')::uuid`** | `current_setting(..., true)` a secas | El segundo argumento devuelve `NULL` solo mientras la variable nunca se ha fijado en la conexión. Tras el primer `SET LOCAL`, al terminar la transacción queda como **cadena vacía**, y `''::uuid` lanza excepción. Con conexiones recicladas en un pool eso convierte "no se ve ninguna fila" en un error 500. El `nullif` restaura el fallo cerrado. Detectado por los tests de integración; corregido en la migración `0003` |
+| 017 | **Alembic usa el mismo driver asíncrono que la aplicación** (`asyncpg` + `connection.run_sync`) | Reescribir la URL a `postgresql://` y usar un driver síncrono | SQLAlchemy 2.1 resuelve `postgresql://` a `psycopg` 3, que no es dependencia del proyecto: las migraciones no arrancaban. Un segundo driver además haría que un problema de conexión o de TLS se comportara distinto en las migraciones que en la aplicación |
+| 018 | **El entorno de desarrollo se ajusta al código, no al revés**: MinIO se configura con KMS para admitir cifrado en reposo | Hacer configurable el `ServerSideEncryption` del almacén | Una opción para desactivar el cifrado acaba puesta en producción. El almacén exige SSE en cada `PutObject` sin excepciones; es el `docker-compose.yml` el que provee la clave KMS |
+| 019 | **Los privilegios `UPDATE` y `DELETE` sobre `audit_log` se retiran al rol de aplicación** | Confiar solo en la ausencia de política RLS para esas operaciones | Sin política, PostgreSQL no da error: filtra todas las filas y la sentencia termina con éxito y cero filas afectadas, así que un intento de manipular la bitácora no deja rastro. Retirar el privilegio lo convierte en un error explícito, visible en el log del servidor e independiente de que RLS siga activo |
 
 ---
 
@@ -671,7 +675,7 @@ de tablas, trazas de excepción, ni registros de otro tenant — esto último ve
 |-------|-------------|---------|------|
 | Unitario | pytest, Hypothesis | Dominio puro: validador de RUC, normalización de periodo, políticas de completitud, agregador de confianza. Sin BD ni red | ≥ 90 % en `domain/` |
 | Aplicación | pytest-asyncio, dobles de prueba | Casos de uso contra puertos simulados | ≥ 85 % en `application/` |
-| Integración | Testcontainers (PostgreSQL, Redis, MinIO) | Repositorios reales, migraciones, **políticas RLS**, jobs de cola | — |
+| Integración ✅ | pytest contra los servicios de `docker compose` (PostgreSQL, Redis, MinIO) | Migraciones aplicadas, **RLS verificado sobre la base real**, privilegios del rol de aplicación, consumo atómico del `state` OAuth, ciclo completo del almacén de adjuntos | 36 tests |
 | Contrato | Schemathesis sobre el OpenAPI | Fuzzing de todos los endpoints contra su esquema | sin 500 inesperados |
 | Seguridad | Suite dedicada | Acceso cruzado entre tenants, escalada de rol, JWT manipulado (`alg: none`, firma inválida, `aud` erróneo), path traversal en el nombre del adjunto, PDF bomb, archivo con magic bytes falsos | todos deben recibir un rechazo |
 | E2E | Playwright | Login → vincular buzón (mock) → escanear → revisar → exportar | flujos críticos |
@@ -679,6 +683,31 @@ de tablas, trazas de excepción, ni registros de otro tenant — esto último ve
 | Estático | ruff, mypy strict, bandit, semgrep, import-linter, eslint, tsc | Todo el código | sin hallazgos nuevos |
 
 Fixtures con datos sintéticos. **Ningún documento tributario real en el repositorio.**
+
+### Por qué los tests de integración no son opcionales
+
+Row Level Security falla en silencio. PostgreSQL exime de las políticas al propietario de
+la tabla y a los superusuarios, así que una aplicación conectada con el rol equivocado ve
+el esquema completo con RLS "habilitado" en cada panel y sin filtrar una sola fila: no hay
+error, no hay aviso, y los datos fiscales de un cliente quedan visibles para otro.
+
+Ninguna comprobación estática puede detectarlo —la política está escrita, la columna
+existe, la migración la aplica— porque lo que falta es el rol. De ahí la división:
+
+- `tests/security/test_cobertura_de_rls.py` compara la metadata del código con el
+  contrato `TABLAS_CON_RLS` de cada migración. Cubre **el olvido**, que es el fallo
+  frecuente, y corre en cada push sin infraestructura.
+- `tests/integration/test_aislamiento_rls.py` lee `pg_policies` y `pg_roles` de la base
+  real y ejerce accesos cruzados con el rol de aplicación. Cubre **la configuración**,
+  que es el fallo raro y el grave.
+
+Se prescindió de `testcontainers`: el repositorio ya trae los tres servicios en
+`docker-compose.yml` y en CI los runners ofrecen `services:` nativos. Una librería que
+arranque contenedores desde el proceso de pytest añadiría una dependencia de desarrollo,
+exigiría Docker accesible desde el propio test y duplicaría el lugar donde se declaran las
+versiones de PostgreSQL y Redis. Los tests leen las URLs del entorno y se saltan solos si
+no hay nada escuchando; en CI un salto se trata como fallo, porque un trabajo en verde que
+no comprobó nada es peor que un trabajo rojo.
 
 ---
 
@@ -742,7 +771,7 @@ expuesto a Internet todas las bibliotecas nativas de parseo.
 | **4 — Extracción** ✅ | Cadena de estrategias, preprocesamiento OpenCV, perfil SUNAT, objetos de valor con validación, confianza por campo | Precisión medida sobre un set sintético etiquetado |
 | **5 — Revisión y reportes** ✅ | Cola de revisión humana, corrección y aprobación, export Excel/CSV asíncrono, estadísticas | Flujo completo extremo a extremo |
 | **6 — Frontend** | Design system, features, cliente generado, BFF, SSE, a11y, tests | Playwright en verde sobre los flujos críticos |
-| **7 — Endurecimiento** | Rate limiting, cuotas, circuit breakers, aislamiento del worker, escaneo de imágenes, firma, pruebas de carga y suite de seguridad | Informe de seguridad y de carga |
+| **7 — Endurecimiento** 🔄 | Tests de integración contra PostgreSQL, Redis y MinIO reales ✅ · rate limiting, cuotas, circuit breakers, aislamiento del worker y escaneo de imágenes ✅ (fases 0–3) · pendientes: pruebas de carga con k6 y E2E con Playwright | Informe de seguridad y de carga |
 | **8 — Operación** | Runbooks, dashboards, alertas, manual técnico y de usuario, despliegue a producción | Sistema operando y documentado |
 
 ---

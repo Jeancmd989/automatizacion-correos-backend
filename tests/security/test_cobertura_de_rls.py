@@ -27,80 +27,24 @@ Por que hace falta
 
 from __future__ import annotations
 
-import importlib.util
 import re
-from pathlib import Path
 
 import pytest
 
 from mailauto.shared.db.base import Base
+from tests.contratos_de_esquema import (
+    TABLAS_GLOBALES,
+    ficheros_de_migracion,
+    importar_todos_los_modelos,
+    tablas_de_negocio,
+    tablas_protegidas_por_las_migraciones,
+)
 
 pytestmark = pytest.mark.security
 
-# Tablas que NO se filtran por tenant a proposito. `tenants` y `users`
-# no tienen columna; `memberships` si la tiene, pero es justo la tabla
-# que dice a que tenant pertenece un usuario, y filtrarla por el
-# tenant activo seria circular.
-TABLAS_GLOBALES: frozenset[str] = frozenset({"tenants", "users", "memberships"})
-
-_RAIZ = Path(__file__).resolve().parents[2]
-_MIGRACIONES = _RAIZ / "migrations" / "versions"
-
-
-def _importar_todos_los_modelos() -> None:
-    """
-    Puebla `Base.metadata`.
-
-    Sin estos imports la metadata esta vacia y el fichero entero
-    pasaria sin comprobar nada, que es peor que no tenerlo.
-    """
-    import mailauto.modules.audit.infrastructure.repository
-    import mailauto.modules.extraction.infrastructure.persistence.models
-    import mailauto.modules.identity.infrastructure.models
-    import mailauto.modules.ingestion.infrastructure.models
-    import mailauto.modules.mailbox.infrastructure.models
-    import mailauto.modules.reporting.infrastructure.models  # noqa: F401
-
-
-def _ficheros_de_migracion() -> list[Path]:
-    ficheros = sorted(_MIGRACIONES.glob("*.py"))
-    assert ficheros, "No se encontro ninguna migracion"
-    return ficheros
-
 
 def _texto_de_las_migraciones() -> str:
-    return "\n".join(f.read_text(encoding="utf-8") for f in _ficheros_de_migracion())
-
-
-def _tablas_protegidas_por_las_migraciones() -> set[str]:
-    """
-    Union de las constantes `TABLAS_CON_RLS` de todas las migraciones.
-
-    Se leen de la constante y no del texto SQL porque las migraciones
-    generan las sentencias en un bucle: el literal
-    `ALTER TABLE attachments ...` no llega a aparecer en el fichero.
-    La constante es el contrato explicito entre migracion y test.
-    """
-    protegidas: set[str] = set()
-    for fichero in _ficheros_de_migracion():
-        especificacion = importlib.util.spec_from_file_location(
-            f"_migracion_{fichero.stem}", fichero
-        )
-        assert especificacion is not None
-        assert especificacion.loader is not None
-        modulo = importlib.util.module_from_spec(especificacion)
-        especificacion.loader.exec_module(modulo)
-        protegidas.update(getattr(modulo, "TABLAS_CON_RLS", ()))
-    return protegidas
-
-
-def _tablas_de_negocio() -> set[str]:
-    _importar_todos_los_modelos()
-    return {
-        nombre
-        for nombre, tabla in Base.metadata.tables.items()
-        if "tenant_id" in tabla.columns and nombre not in TABLAS_GLOBALES
-    }
+    return "\n".join(f.read_text(encoding="utf-8") for f in ficheros_de_migracion())
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -110,12 +54,12 @@ def _tablas_de_negocio() -> set[str]:
 
 def test_la_metadata_no_esta_vacia() -> None:
     """Si los imports fallaran, el resto del fichero pasaria en falso."""
-    _importar_todos_los_modelos()
+    importar_todos_los_modelos()
     assert len(Base.metadata.tables) >= 9
 
 
 def test_se_detectan_tablas_de_negocio() -> None:
-    assert len(_tablas_de_negocio()) >= 7
+    assert len(tablas_de_negocio()) >= 7
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -124,7 +68,7 @@ def test_se_detectan_tablas_de_negocio() -> None:
 
 
 def test_toda_tabla_de_negocio_lleva_tenant_id() -> None:
-    _importar_todos_los_modelos()
+    importar_todos_los_modelos()
     sin_tenant = {
         nombre for nombre, tabla in Base.metadata.tables.items() if "tenant_id" not in tabla.columns
     }
@@ -141,7 +85,7 @@ def test_toda_tabla_de_negocio_esta_declarada_con_rls() -> None:
     produce ningun error y abre un agujero en un esquema que por lo
     demas esta bien protegido.
     """
-    sin_proteger = sorted(_tablas_de_negocio() - _tablas_protegidas_por_las_migraciones())
+    sin_proteger = sorted(tablas_de_negocio() - tablas_protegidas_por_las_migraciones())
     assert not sin_proteger, (
         f"Tablas con tenant_id que ninguna migracion protege con RLS: {sin_proteger}"
     )
@@ -149,8 +93,8 @@ def test_toda_tabla_de_negocio_esta_declarada_con_rls() -> None:
 
 def test_las_migraciones_no_declaran_tablas_inexistentes() -> None:
     """Al reves: una tabla en la lista que ya nadie usa es ruido que confunde."""
-    _importar_todos_los_modelos()
-    declaradas = _tablas_protegidas_por_las_migraciones()
+    importar_todos_los_modelos()
+    declaradas = tablas_protegidas_por_las_migraciones()
     existentes = set(Base.metadata.tables)
     assert declaradas <= existentes, (
         f"Tablas declaradas con RLS que no existen: {sorted(declaradas - existentes)}"
@@ -183,19 +127,25 @@ def test_las_migraciones_crean_politicas() -> None:
     assert re.search(r"CREATE POLICY\s+\w+\s+ON\s+\S+", texto)
 
 
-def test_las_politicas_comparan_contra_la_variable_de_sesion() -> None:
+def test_toda_migracion_con_politicas_usa_la_variable_de_sesion() -> None:
     """
-    Una politica que no lea `app.current_tenant` no filtra por el
-    tenant de la transaccion, por bien escrita que este.
+    Una politica que no lea `app.current_tenant` no filtra por el tenant
+    de la transaccion, por bien escrita que este.
+
+    La comprobacion es por fichero y no por politica porque una
+    migracion puede construir la expresion en una constante y
+    reutilizarla en `upgrade` y `downgrade`; buscar el literal dentro
+    del cuerpo de cada `CREATE POLICY` solo mediria el estilo de
+    escritura. Que la politica que PostgreSQL acaba teniendo compare
+    contra la variable lo verifica
+    `tests/integration/test_aislamiento_rls.py`, leyendo `pg_policies`.
     """
-    texto = _texto_de_las_migraciones()
-    politicas = re.findall(
-        r"CREATE POLICY\s+\w+\s+ON\s+(\S+)(.*?)(?:\"\"\"|\n\s*\)\n)", texto, re.S
-    )
-    assert politicas, "No se encontro ninguna politica"
-    for tabla, cuerpo in politicas:
-        assert "app.current_tenant" in cuerpo, (
-            f"La politica de {tabla} no compara contra app.current_tenant"
+    for fichero in ficheros_de_migracion():
+        texto = fichero.read_text(encoding="utf-8")
+        if "CREATE POLICY" not in texto:
+            continue
+        assert "app.current_tenant" in texto, (
+            f"{fichero.name} crea politicas sin mencionar app.current_tenant"
         )
 
 

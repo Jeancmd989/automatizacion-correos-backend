@@ -10,7 +10,8 @@ almacenamiento **S3/MinIO** y arquitectura hexagonal **verificada en CI**.
 
 ## Estado
 
-Implementadas las **fases 0 a 5** del [plan de arquitectura](ARQUITECTURA.md#17-plan-de-implementación-por-fases):
+Implementadas las **fases 0 a 5** y los tests de integración de la **fase 7** del
+[plan de arquitectura](ARQUITECTURA.md#17-plan-de-implementación-por-fases):
 
 | Fase | Contenido | Estado |
 |------|-----------|--------|
@@ -21,14 +22,27 @@ Implementadas las **fases 0 a 5** del [plan de arquitectura](ARQUITECTURA.md#17-
 | 4 | Extracción en cuatro motores, perfil SUNAT, confianza por campo | ✅ |
 | 5 | Cola de revisión humana, reportes Excel/CSV asíncronos | ✅ |
 | 6 | Frontend (interfaz de operación) | pendiente |
-| 7 | Endurecimiento, tests de integración, pruebas de carga | pendiente |
+| 7 | Tests de integración contra PostgreSQL, Redis y S3 reales | ✅ |
+| 7 | Pruebas de carga y E2E | pendiente |
 | 8 | Operación: runbooks, dashboards, despliegue | pendiente |
 
-**Verificación actual:** 336 tests en verde, 6/6 contratos de arquitectura, `mypy --strict`
-sin hallazgos, `ruff`, `bandit` y `pip-audit` limpios. Cobertura: dominio 92–100 %,
-capa de aplicación 73–100 %. Los adaptadores de entrada/salida (repositorios, OCR,
-proveedores HTTP) quedan sin cubrir hasta los tests de integración con contenedores
-de la fase 7.
+**Verificación actual:** 372 tests en verde (336 sin infraestructura + 36 de
+integración), 6/6 contratos de arquitectura, `mypy --strict` sin hallazgos, `ruff`,
+`bandit` y `pip-audit` limpios. Cobertura: dominio 92–100 %, capa de aplicación
+73–100 %.
+
+Los tests de integración corren contra PostgreSQL, Redis y MinIO reales, y son los
+únicos que pueden afirmar que el aislamiento multi-tenant funciona. Encontraron tres
+defectos que ninguna comprobación estática podía detectar:
+
+- Las migraciones no arrancaban: la URL síncrona que usaba Alembic resuelve al driver
+  `psycopg`, que no es dependencia del proyecto. Ahora Alembic usa el mismo `asyncpg`
+  que la aplicación.
+- Las políticas RLS lanzaban `invalid input syntax for type uuid: ""` en cualquier
+  conexión reciclada del pool. `SET LOCAL` no deja la variable indefinida al terminar
+  la transacción: la deja vacía. Corregido en la migración `0003`.
+- Ningún adjunto se podía guardar con el `docker compose` del repositorio: el almacén
+  exige cifrado en reposo y MinIO sin KMS lo rechaza.
 
 ---
 
@@ -104,12 +118,33 @@ mypy --config-file pyproject.toml
 ```
 
 ```bash
-pytest -q
+pytest -q -m "not integration"
 ```
 
 ```bash
-bandit -q -c pyproject.toml -r src && pip-audit
+bandit -q -c pyproject.toml -r src && pip-audit --skip-editable
 ```
+
+Los tests de integración necesitan los servicios en marcha y van aparte:
+
+```bash
+docker compose up -d postgres redis minio && docker compose run --rm migraciones
+```
+
+```bash
+pytest -q -m integration
+```
+
+Se saltan solos, con un aviso que explica qué levantar, si no encuentran nada
+escuchando. En CI eso sería un trabajo en verde sin haber comprobado nada, así que allí
+un salto se trata como fallo.
+
+Las URLs de conexión se leen de `TEST_DATABASE_URL`, `TEST_DATABASE_URL_OWNER`,
+`TEST_REDIS_URL` y `TEST_STORAGE_ENDPOINT_URL`, y por defecto apuntan a los puertos del
+`docker-compose.yml`. **Son dos URLs de la misma base a propósito:** una con el rol
+propietario, que solo siembra datos, y otra con el rol de aplicación, que es el que debe
+estar sometido a RLS. Usar la misma para ambas cosas dejaría los tests pasando sin
+verificar nada.
 
 `lint-imports` es el que conviene no saltarse: verifica que las capas no se han cruzado.
 Un import "temporal" de infraestructura dentro del dominio falla el pipeline, y es así

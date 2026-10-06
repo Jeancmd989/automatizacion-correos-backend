@@ -95,8 +95,14 @@ jobs:
       - name: Instalar dependencias
         run: pip install -e ".[dev]"
 
+      # Se excluye `integration` de forma explicita: esas pruebas tienen
+      # su propio trabajo con servicios. Sin el marcador se saltarian
+      # solas al no encontrar nada escuchando, y un "skipped" silencioso
+      # es indistinguible de una prueba que nadie escribio.
       - name: Ejecutar suite
-        run: pytest -q --cov=src/mailauto --cov-report=term-missing --cov-report=xml
+        run: >-
+          pytest -q -m "not integration"
+          --cov=src/mailauto --cov-report=term-missing --cov-report=xml
 
       - name: Publicar cobertura
         uses: actions/upload-artifact@v4
@@ -104,6 +110,121 @@ jobs:
           name: cobertura
           path: coverage.xml
           retention-days: 7
+
+  # ───────────────────────────────────────────────────────────────────
+  # Lo que no se puede verificar sin infraestructura real.
+  #
+  # Row Level Security es la razon de que este trabajo exista. Una
+  # politica puede estar escrita, declarada y activa, y no filtrar nada:
+  # PostgreSQL exime de las politicas al propietario de la tabla y a los
+  # superusuarios, asi que basta conectarse con el rol equivocado para
+  # anular el aislamiento entre clientes sin que aparezca ningun error.
+  # Por eso aqui se provisiona la base igual que en produccion, con el
+  # rol de aplicacion separado del propietario, usando el mismo
+  # `scripts/init-db.sql` que usa el entorno de desarrollo: si ese script
+  # se rompe, se nota aqui.
+  # ───────────────────────────────────────────────────────────────────
+  integracion:
+    name: Tests de integracion
+    runs-on: ubuntu-latest
+    needs: [verificacion]
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: mailauto
+          POSTGRES_USER: mailauto_owner
+          POSTGRES_PASSWORD: desarrollo
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mailauto_owner -d mailauto"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+
+    env:
+      ENVIRONMENT: testing
+      DATABASE_URL: postgresql+asyncpg://mailauto_owner:desarrollo@localhost:5432/mailauto
+      REDIS_URL: redis://localhost:6379/0
+      OIDC_ISSUER: https://ci.ejemplo.com/
+      OIDC_AUDIENCE: https://api.ejemplo.com
+      MASTER_KEY_B64: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      GOOGLE_CLIENT_ID: ci
+      GOOGLE_CLIENT_SECRET: ci
+      STORAGE_ACCESS_KEY: minioadmin
+      STORAGE_SECRET_KEY: minioadmin
+      TEST_DATABASE_URL: postgresql+asyncpg://mailauto_app:desarrollo@localhost:5432/mailauto
+      TEST_DATABASE_URL_OWNER: postgresql+asyncpg://mailauto_owner:desarrollo@localhost:5432/mailauto
+      TEST_REDIS_URL: redis://localhost:6379/15
+      TEST_STORAGE_ENDPOINT_URL: http://localhost:9000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -e ".[dev]"
+
+      # El almacen exige cifrado en reposo en cada PutObject y MinIO
+      # responde NotImplemented a SSE-S3 sin KMS. La clave son 32 bytes
+      # en base64 y solo vive en este contenedor efimero.
+      #
+      # MinIO va con `docker run` y no como `service` porque los
+      # contenedores de servicio no permiten sustituir el comando de la
+      # imagen, y esta necesita `server /data`.
+      - name: Levantar MinIO
+        run: |
+          docker run -d --name minio -p 9000:9000             -e MINIO_ROOT_USER=minioadmin             -e MINIO_ROOT_PASSWORD=minioadmin             -e MINIO_KMS_SECRET_KEY=desarrollo:ZGVzYXJyb2xsby1sb2NhbC1zaW4tdmFsb3ItcmVhbCE=             minio/minio:latest server /data
+          for intento in $(seq 1 30); do
+            curl -sf http://localhost:9000/minio/health/live && exit 0
+            sleep 2
+          done
+          echo "::error::MinIO no respondio a la sonda de salud"
+          docker logs minio
+          exit 1
+
+      # Crea `mailauto_app` SIN privilegios de propietario. Es la pieza
+      # que hace que RLS filtre de verdad, y el test de integracion falla
+      # si este paso se salta.
+      - name: Provisionar el rol de aplicacion
+        env:
+          PGPASSWORD: desarrollo
+        run: psql -h localhost -U mailauto_owner -d mailauto -v ON_ERROR_STOP=1 -f scripts/init-db.sql
+
+      - name: Aplicar migraciones
+        run: alembic upgrade head
+
+      # Los tests se saltan solos cuando no encuentran los servicios, lo
+      # cual es correcto en local y peligroso aqui: un trabajo verde sin
+      # haber comprobado nada. Por eso se exige que haya pasos superados
+      # y ningun salto.
+      - name: Ejecutar tests de integracion
+        run: |
+          set -o pipefail
+          pytest -m integration -q --no-header | tee resultado.txt
+          grep -qE "[0-9]+ passed" resultado.txt             || { echo "::error::Ningun test de integracion se ejecuto"; exit 1; }
+          if grep -qE "[0-9]+ skipped" resultado.txt; then
+            echo "::error::Se saltaron tests de integracion: falta algun servicio"
+            exit 1
+          fi
+
+      - name: Registro de MinIO si algo fallo
+        if: failure()
+        run: docker logs minio
 
   contrato-openapi:
     name: Contrato OpenAPI

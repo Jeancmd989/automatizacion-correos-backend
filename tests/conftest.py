@@ -20,6 +20,7 @@ from uuid import UUID
 
 import pytest
 
+from mailauto.bootstrap.settings import Settings
 from mailauto.shared.crypto.envelope import ClaveMaestraLocal, ServicioDeCifrado
 from mailauto.shared.security.context import Rol, TenantContext
 
@@ -31,7 +32,17 @@ USUARIO_B = UUID("00000000-0000-7000-8000-0000000000b1")
 
 @pytest.fixture(autouse=True)
 def _entorno_de_pruebas(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Variables minimas para que importar la configuracion no falle."""
+    """
+    Variables minimas para que importar la configuracion no falle.
+
+    Tambien desconecta la lectura de `.env`. `pydantic-settings` lo carga
+    desde el directorio de trabajo, asi que el fichero de desarrollo de
+    quien ejecuta la suite se colaba en los tests que construyen una
+    configuracion de produccion: fallaban en local y pasaban en CI, donde
+    no hay `.env`. Un test cuyo resultado dependa de un fichero que no
+    esta versionado no verifica nada.
+    """
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
     monkeypatch.setenv("ENVIRONMENT", "testing")
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@localhost:5432/mailauto_test")
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/1")

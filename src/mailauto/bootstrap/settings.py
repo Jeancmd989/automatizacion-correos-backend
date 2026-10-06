@@ -283,11 +283,6 @@ class Settings(BaseSettings):
     def microsoft_habilitado(self) -> bool:
         return bool(self.microsoft_client_id and self.microsoft_client_secret)
 
-    @property
-    def database_url_sync(self) -> str:
-        """URL sincrona, requerida por Alembic (que no es async)."""
-        return str(self.database_url).replace("postgresql+asyncpg://", "postgresql://")
-
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
