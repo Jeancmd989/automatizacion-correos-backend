@@ -1,5 +1,5 @@
 """
-Almacen de adjuntos contra un S3 real (MinIO).
+Almacen de adjuntos contra un S3 real.
 
 Proposito
     Verificar el ciclo completo de un adjunto —guardar, descargar, firmar
@@ -12,7 +12,7 @@ Por que hace falta el servicio
     funciona.
 
 Dependencias
-    MinIO (o S3) accesible, con credenciales de desarrollo.
+    Un S3 compatible accesible (LocalStack en desarrollo y en CI).
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ _CONTENIDO = b"%PDF-1.7\nconstancia de prueba\n"
 
 @pytest.fixture
 async def almacen() -> AsyncIterator[AlmacenDeObjetosS3]:
-    exigir_servicio("MinIO", ENDPOINT_ALMACEN, 9000)
+    exigir_servicio("el almacen de objetos", ENDPOINT_ALMACEN, 4566)
     # Bucket propio del test: no comparte espacio con el de desarrollo.
     instancia = AlmacenDeObjetosS3(
         bucket=f"pruebas-{uuid4().hex[:12]}",
@@ -109,13 +109,12 @@ async def test_la_url_presignada_no_lleva_la_clave_secreta() -> None:
     acaba en el historial del navegador y en los logs de cualquier proxy
     intermedio.
 
-    Se firma con un secreto distintivo y no con las credenciales de
-    MinIO porque en desarrollo el identificador y el secreto valen lo
-    mismo (`minioadmin`), y `X-Amz-Credential` contiene el
-    identificador a proposito: con valores iguales la asercion no
-    distinguiria uno de otro y pasaria sin comprobar nada. Presignar es
-    un calculo local, asi que no importa que estas credenciales no
-    sirvan para conectar.
+    Se firma con un secreto distintivo y no con las credenciales del
+    entorno porque `X-Amz-Credential` contiene el identificador a
+    proposito: si el test se limitara a buscar el valor configurado, no
+    sabria distinguir la parte publica de la firma del secreto que si
+    debe quedar fuera. Presignar es un calculo local, asi que no importa
+    que estas credenciales no sirvan para conectar.
     """
     secreto = "este-secreto-no-debe-aparecer-en-la-url"
     almacen = AlmacenDeObjetosS3(

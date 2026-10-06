@@ -8,7 +8,8 @@ Proposito
     declarada y activa, y no filtrar nada.
 
 Dependencias
-    Los servicios de `docker compose`: PostgreSQL, Redis y MinIO.
+    Los servicios de `docker compose`: PostgreSQL, Redis y el almacen
+    de objetos compatible con S3.
 
 Decisiones de diseño
     1. Sin `testcontainers`. El proyecto ya trae un `docker-compose.yml`
@@ -57,13 +58,13 @@ URL_APLICACION = os.getenv(
 )
 # Base 15: las pruebas hacen FLUSHDB, y la 0 es la de desarrollo.
 URL_REDIS = os.getenv("TEST_REDIS_URL", "redis://localhost:6379/15")
-ENDPOINT_ALMACEN = os.getenv("TEST_STORAGE_ENDPOINT_URL", "http://localhost:9000")
-CLAVE_ALMACEN = os.getenv("TEST_STORAGE_ACCESS_KEY", "minioadmin")
-SECRETO_ALMACEN = os.getenv("TEST_STORAGE_SECRET_KEY", "minioadmin")
+ENDPOINT_ALMACEN = os.getenv("TEST_STORAGE_ENDPOINT_URL", "http://localhost:4566")
+CLAVE_ALMACEN = os.getenv("TEST_STORAGE_ACCESS_KEY", "desarrollo")
+SECRETO_ALMACEN = os.getenv("TEST_STORAGE_SECRET_KEY", "desarrollo-secreto")
 
 _AVISO = (
     "{servicio} no responde en {destino}. Levanta los servicios con "
-    "`docker compose up -d postgres redis minio`."
+    "`docker compose up -d postgres redis almacen`."
 )
 
 

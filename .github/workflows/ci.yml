@@ -152,6 +152,23 @@ jobs:
           --health-timeout 3s
           --health-retries 12
 
+      # Almacen compatible con S3. Puede declararse como servicio porque
+      # su imagen arranca sola: no hay que sustituir su comando, que es lo
+      # que los contenedores de servicio no permiten.
+      almacen:
+        image: localstack/localstack:4
+        env:
+          SERVICES: s3
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: desarrollo
+          AWS_SECRET_ACCESS_KEY: desarrollo-secreto
+        ports: ["4566:4566"]
+        options: >-
+          --health-cmd "curl -sf http://localhost:4566/_localstack/health || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 24
+
     env:
       ENVIRONMENT: testing
       DATABASE_URL: postgresql+asyncpg://mailauto_owner:desarrollo@localhost:5432/mailauto
@@ -161,12 +178,14 @@ jobs:
       MASTER_KEY_B64: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
       GOOGLE_CLIENT_ID: ci
       GOOGLE_CLIENT_SECRET: ci
-      STORAGE_ACCESS_KEY: minioadmin
-      STORAGE_SECRET_KEY: minioadmin
+      STORAGE_ACCESS_KEY: desarrollo
+      STORAGE_SECRET_KEY: desarrollo-secreto
       TEST_DATABASE_URL: postgresql+asyncpg://mailauto_app:desarrollo@localhost:5432/mailauto
       TEST_DATABASE_URL_OWNER: postgresql+asyncpg://mailauto_owner:desarrollo@localhost:5432/mailauto
       TEST_REDIS_URL: redis://localhost:6379/15
-      TEST_STORAGE_ENDPOINT_URL: http://localhost:9000
+      TEST_STORAGE_ENDPOINT_URL: http://localhost:4566
+      TEST_STORAGE_ACCESS_KEY: desarrollo
+      TEST_STORAGE_SECRET_KEY: desarrollo-secreto
 
     steps:
       - uses: actions/checkout@v4
@@ -178,24 +197,6 @@ jobs:
 
       - name: Instalar dependencias
         run: pip install -e ".[dev]"
-
-      # El almacen exige cifrado en reposo en cada PutObject y MinIO
-      # responde NotImplemented a SSE-S3 sin KMS. La clave son 32 bytes
-      # en base64 y solo vive en este contenedor efimero.
-      #
-      # MinIO va con `docker run` y no como `service` porque los
-      # contenedores de servicio no permiten sustituir el comando de la
-      # imagen, y esta necesita `server /data`.
-      - name: Levantar MinIO
-        run: |
-          docker run -d --name minio -p 9000:9000             -e MINIO_ROOT_USER=minioadmin             -e MINIO_ROOT_PASSWORD=minioadmin             -e MINIO_KMS_SECRET_KEY=desarrollo:ZGVzYXJyb2xsby1sb2NhbC1zaW4tdmFsb3ItcmVhbCE=             minio/minio:latest server /data
-          for intento in $(seq 1 30); do
-            curl -sf http://localhost:9000/minio/health/live && exit 0
-            sleep 2
-          done
-          echo "::error::MinIO no respondio a la sonda de salud"
-          docker logs minio
-          exit 1
 
       # Crea `mailauto_app` SIN privilegios de propietario. Es la pieza
       # que hace que RLS filtre de verdad, y el test de integracion falla
@@ -221,10 +222,6 @@ jobs:
             echo "::error::Se saltaron tests de integracion: falta algun servicio"
             exit 1
           fi
-
-      - name: Registro de MinIO si algo fallo
-        if: failure()
-        run: docker logs minio
 
   contrato-openapi:
     name: Contrato OpenAPI

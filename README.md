@@ -4,7 +4,7 @@ Ingesta de adjuntos de correo (Gmail / Outlook) y extracción de datos tributari
 con aislamiento estricto entre clientes, workers asíncronos y progreso en vivo.
 
 API en **FastAPI** sobre **PostgreSQL** con Row Level Security, cola **ARQ/Redis**,
-almacenamiento **S3/MinIO** y arquitectura hexagonal **verificada en CI**.
+almacenamiento **compatible con S3** y arquitectura hexagonal **verificada en CI**.
 
 ---
 
@@ -31,8 +31,8 @@ integración), 6/6 contratos de arquitectura, `mypy --strict` sin hallazgos, `ru
 `bandit` y `pip-audit` limpios. Cobertura: dominio 92–100 %, capa de aplicación
 73–100 %.
 
-Los tests de integración corren contra PostgreSQL, Redis y MinIO reales, y son los
-únicos que pueden afirmar que el aislamiento multi-tenant funciona. Encontraron tres
+Los tests de integración corren contra PostgreSQL, Redis y un S3 real, y son los
+únicos que pueden afirmar que el aislamiento multi-tenant funciona. Encontraron cuatro
 defectos que ninguna comprobación estática podía detectar:
 
 - Las migraciones no arrancaban: la URL síncrona que usaba Alembic resuelve al driver
@@ -42,7 +42,10 @@ defectos que ninguna comprobación estática podía detectar:
   conexión reciclada del pool. `SET LOCAL` no deja la variable indefinida al terminar
   la transacción: la deja vacía. Corregido en la migración `0003`.
 - Ningún adjunto se podía guardar con el `docker compose` del repositorio: el almacén
-  exige cifrado en reposo y MinIO sin KMS lo rechaza.
+  exige cifrado en reposo y el servicio de desarrollo lo rechazaba.
+- La imagen `minio/minio` había desaparecido de Docker Hub, así que un clon reciente no
+  podía ni levantar el entorno. El almacén de desarrollo y de CI pasa a ser LocalStack,
+  que es pública, está mantenida e implementa tanto SSE-S3 como el presignado v4.
 
 ---
 
@@ -66,14 +69,15 @@ Completa las credenciales OAuth de Google y/o Microsoft y levanta todo:
 docker compose up
 ```
 
-Esto arranca API, worker de ingesta, worker de cron, PostgreSQL, Redis, MinIO y Jaeger,
+Esto arranca API, worker de ingesta, worker de cron, PostgreSQL, Redis, el almacén de
+objetos y Jaeger,
 y aplica las migraciones antes de que la API acepte tráfico.
 
 | Servicio | URL |
 |----------|-----|
 | API | http://localhost:8000 |
 | Documentación interactiva | http://localhost:8000/docs |
-| Consola de MinIO | http://localhost:9001 |
+| Almacén de objetos (S3) | http://localhost:4566 |
 | Trazas (Jaeger) | http://localhost:16686 |
 
 ---
@@ -128,7 +132,7 @@ bandit -q -c pyproject.toml -r src && pip-audit --skip-editable
 Los tests de integración necesitan los servicios en marcha y van aparte:
 
 ```bash
-docker compose up -d postgres redis minio && docker compose run --rm migraciones
+docker compose up -d postgres redis almacen && docker compose run --rm migraciones
 ```
 
 ```bash

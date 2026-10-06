@@ -1,7 +1,8 @@
 # ─────────────────────────────────────────────────────────────────────
 # Entorno de desarrollo completo: `docker compose up`.
 #
-# Levanta API, los dos workers, PostgreSQL, Redis, MinIO y Jaeger. El
+# Levanta API, los dos workers, PostgreSQL, Redis, el almacen de objetos
+# y Jaeger. El
 # objetivo es que nadie tenga que instalar Tesseract ni configurar nada
 # a mano para empezar a trabajar.
 #
@@ -15,9 +16,9 @@ x-entorno-comun: &entorno-comun
   ENVIRONMENT: development
   DATABASE_URL: postgresql+asyncpg://mailauto_app:desarrollo@postgres:5432/mailauto
   REDIS_URL: redis://redis:6379/0
-  STORAGE_ENDPOINT_URL: http://minio:9000
-  STORAGE_ACCESS_KEY: minioadmin
-  STORAGE_SECRET_KEY: minioadmin
+  STORAGE_ENDPOINT_URL: http://almacen:4566
+  STORAGE_ACCESS_KEY: desarrollo
+  STORAGE_SECRET_KEY: desarrollo-secreto
   STORAGE_BUCKET: adjuntos
   OTEL_EXPORTER_ENDPOINT: http://jaeger:4318
 
@@ -56,30 +57,36 @@ services:
       timeout: 3s
       retries: 10
 
-  minio:
-    image: minio/minio:latest
-    command: ["server", "/data", "--console-address", ":9001"]
+  # Almacen de objetos compatible con S3.
+  #
+  # Fue MinIO hasta que su imagen desaparecio de Docker Hub (y quay.io
+  # responde 401): un `docker compose up` recien clonado no podia
+  # arrancar. LocalStack es publica, mantenida, implementa SSE-S3 —que el
+  # adaptador exige en cada PutObject— y firma URLs presignadas v4 que de
+  # verdad descargan. Alternativas descartadas: `bitnamilegacy/minio`,
+  # marcada como legado; Garage, que no soporta cifrado en reposo; y
+  # `adobe/s3mock`, sin garantias sobre presignado.
+  #
+  # Solo se habilita S3: el resto del catalogo de LocalStack no se usa y
+  # arrancarlo alargaria el inicio sin aportar nada.
+  almacen:
+    image: localstack/localstack:4
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-      # El almacen de adjuntos exige cifrado en reposo en cada PutObject.
-      # MinIO responde NotImplemented a SSE-S3 si no tiene KMS, asi que sin
-      # esta clave ningun adjunto se puede guardar en desarrollo. Se
-      # configura el entorno en lugar de relajar el codigo: una opcion para
-      # desactivar el cifrado acabaria puesta en produccion.
-      # El valor son 32 bytes en base64 (MinIO rechaza cualquier otra
-      # longitud) y no protege nada real: solo existe en este fichero.
-      MINIO_KMS_SECRET_KEY: desarrollo:ZGVzYXJyb2xsby1sb2NhbC1zaW4tdmFsb3ItcmVhbCE=
+      SERVICES: s3
+      AWS_DEFAULT_REGION: us-east-1
+      # LocalStack acepta cualquier credencial; se nombran para que quede
+      # claro que no protegen nada.
+      AWS_ACCESS_KEY_ID: desarrollo
+      AWS_SECRET_ACCESS_KEY: desarrollo-secreto
     volumes:
-      - datos_minio:/data
+      - datos_almacen:/var/lib/localstack
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "4566:4566"
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health || exit 1"]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 20
 
   jaeger:
     image: jaegertracing/all-in-one:latest
@@ -115,7 +122,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-      minio: { condition: service_healthy }
+      almacen: { condition: service_healthy }
       migraciones: { condition: service_completed_successfully }
     # Recarga en caliente: el codigo se monta y uvicorn vigila cambios.
     volumes:
@@ -134,7 +141,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-      minio: { condition: service_healthy }
+      almacen: { condition: service_healthy }
       migraciones: { condition: service_completed_successfully }
     volumes:
       - ./src:/app/src:ro
@@ -182,4 +189,4 @@ services:
 volumes:
   datos_postgres:
   datos_redis:
-  datos_minio:
+  datos_almacen:

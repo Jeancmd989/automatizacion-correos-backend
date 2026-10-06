@@ -64,7 +64,7 @@ El sistema de referencia resuelve un flujo concreto y válido:
 | H8 | **Polling del frontend al endpoint de estado.** Tráfico constante, latencia de actualización y costo innecesario. | Media | `app/hooks/useAutomatizador.ts` | SSE sobre Redis pub/sub |
 | H9 | **God-hook de 350 líneas** que concentra estado del servidor, polling, OAuth y notificaciones. Sin caché, sin invalidación, sin reintentos. | Media | `useAutomatizador.ts` (350 LOC) | TanStack Query + hooks por feature, estructura *feature-sliced* |
 | H10 | **Contrato de API duplicado a mano** en `app/lib/types.ts`. Deriva silenciosa entre backend y frontend. | Media | `types.ts` frente a los modelos Pydantic | Cliente TypeScript generado desde OpenAPI en CI |
-| H11 | **Sin almacenamiento de objetos.** Los adjuntos viven en el disco del contenedor; se pierde trazabilidad y no se pueden reprocesar. | Media | `AdjuntoDescargado.ruta: Path` | S3/MinIO con cifrado en reposo, claves opacas y URLs prefirmadas de corta vida |
+| H11 | **Sin almacenamiento de objetos.** Los adjuntos viven en el disco del contenedor; se pierde trazabilidad y no se pueden reprocesar. | Media | `AdjuntoDescargado.ruta: Path` | Almacenamiento compatible con S3, con cifrado en reposo, claves opacas y URLs prefirmadas de corta vida |
 | H12 | **El worker de OCR corre en el mismo contenedor que la API**, parseando archivos no confiables de terceros con salida a Internet sin restricción. | Media-Alta — A04 / A08 | `Dockerfile` único | Worker aislado: contenedor propio, usuario no-root, rootfs de solo lectura, egress restringido, límites de CPU/RAM, seccomp |
 | H13 | Hash de deduplicación en **MD5**. | Baja | `models.py` → `content_hash` | SHA-256 |
 | H14 | Archivos de depuración versionados (`debug_out.txt`, `debug_pdf.py`, `test_fixes.py` en la raíz). | Baja — código muerto | raíz del repo | Excluidos; scripts de diagnóstico en `tools/`, fuera del paquete |
@@ -102,14 +102,14 @@ El sistema de referencia resuelve un flujo concreto y válido:
 | 008 | **SSE** para progreso en vivo | Polling, WebSocket | Unidireccional servidor→cliente, sobre HTTP normal, sin sesiones pegajosas; el fan-out se resuelve con Redis pub/sub |
 | 009 | **BFF en route handlers de Next.js**; el access token nunca llega al navegador | Token en `localStorage` | Elimina la clase completa de robo de token por XSS |
 | 010 | **Cliente TypeScript generado desde OpenAPI** | Tipos escritos a mano | Hace imposible la deriva de contrato: el CI falla si el frontend usa un campo que la API ya no expone |
-| 011 | **Almacenamiento de objetos S3/MinIO** para adjuntos | Disco del contenedor, BYTEA en BD | Permite reprocesar, auditar y aplicar retención; evita hinchar la base de datos |
+| 011 | **Almacenamiento de objetos compatible con S3** para adjuntos (AWS S3 en producción, LocalStack en desarrollo y CI) | Disco del contenedor, BYTEA en BD | Permite reprocesar, auditar y aplicar retención; evita hinchar la base de datos |
 | 012 | **Worker de extracción aislado** con egress restringido | Un solo contenedor | El worker ejecuta parsers nativos sobre archivos no confiables: es la superficie de ataque principal |
 | 013 | **Auth0 detrás de un `IdentityProviderPort`** | Keycloak autoalojado, JWT propio | Se conserva lo que ya funciona, sin acoplar el dominio al proveedor |
 | 014 | **Dos repositorios separados** (backend y frontend), como en el sistema de referencia | Monorepo | Despliegue y ciclo de vida independientes, y continuidad con la organización actual del equipo. El coste —no poder cambiar la API y su cliente en el mismo commit— se compensa con el ADR 015 |
 | 015 | **`openapi.json` versionado como contrato compartido** entre ambos repositorios | Paquete npm publicado; sincronización manual | Sin monorepo, el cliente TypeScript no puede regenerarse en el mismo commit que cambia la API. El CI del backend verifica que el esquema versionado está al día (`scripts/exportar_openapi.py`) y el del frontend regenera su cliente a partir de él y falla si hay diferencias. Mismo efecto que el monorepo —deriva de contrato imposible— con un paso más de pipeline y sin publicar un paquete |
 | 016 | Las políticas RLS leen el tenant con **`nullif(current_setting('app.current_tenant', true), '')::uuid`** | `current_setting(..., true)` a secas | El segundo argumento devuelve `NULL` solo mientras la variable nunca se ha fijado en la conexión. Tras el primer `SET LOCAL`, al terminar la transacción queda como **cadena vacía**, y `''::uuid` lanza excepción. Con conexiones recicladas en un pool eso convierte "no se ve ninguna fila" en un error 500. El `nullif` restaura el fallo cerrado. Detectado por los tests de integración; corregido en la migración `0003` |
 | 017 | **Alembic usa el mismo driver asíncrono que la aplicación** (`asyncpg` + `connection.run_sync`) | Reescribir la URL a `postgresql://` y usar un driver síncrono | SQLAlchemy 2.1 resuelve `postgresql://` a `psycopg` 3, que no es dependencia del proyecto: las migraciones no arrancaban. Un segundo driver además haría que un problema de conexión o de TLS se comportara distinto en las migraciones que en la aplicación |
-| 018 | **El entorno de desarrollo se ajusta al código, no al revés**: MinIO se configura con KMS para admitir cifrado en reposo | Hacer configurable el `ServerSideEncryption` del almacén | Una opción para desactivar el cifrado acaba puesta en producción. El almacén exige SSE en cada `PutObject` sin excepciones; es el `docker-compose.yml` el que provee la clave KMS |
+| 018 | **El entorno de desarrollo se ajusta al código, no al revés**: el almacén exige `ServerSideEncryption` en cada `PutObject` sin excepciones, y soportarlo es un requisito del servicio de desarrollo y de CI | Hacer configurable el cifrado del almacén | Una opción para desactivar el cifrado acaba puesta en producción. Fue además el criterio que descartó Garage al sustituir MinIO: sin SSE, el emulador no sirve |
 | 019 | **Los privilegios `UPDATE` y `DELETE` sobre `audit_log` se retiran al rol de aplicación** | Confiar solo en la ausencia de política RLS para esas operaciones | Sin política, PostgreSQL no da error: filtra todas las filas y la sentencia termina con éxito y cero filas afectadas, así que un intento de manipular la bitácora no deja rastro. Retirar el privilegio lo convierte en un error explícito, visible en el log del servidor e independiente de que RLS siga activo |
 
 ---
@@ -159,7 +159,7 @@ El sistema de referencia resuelve un flujo concreto y válido:
 ┌────────┐   ┌────────────┐     ┌────────────┐    ┌──────────────┐
 │ Redis  │   │ PostgreSQL │     │  Object    │    │  Secrets /   │
 │ cola + │   │   + RLS    │     │  Storage   │    │     KMS      │
-│ pubsub │   │            │     │ (S3/MinIO) │    │              │
+│ pubsub │   │            │     │ (S3)       │    │              │
 │ + rate │   └────────────┘     └────────────┘    └──────────────┘
 └───┬────┘          ▲                  ▲
     │ consume       │                  │
@@ -675,7 +675,7 @@ de tablas, trazas de excepción, ni registros de otro tenant — esto último ve
 |-------|-------------|---------|------|
 | Unitario | pytest, Hypothesis | Dominio puro: validador de RUC, normalización de periodo, políticas de completitud, agregador de confianza. Sin BD ni red | ≥ 90 % en `domain/` |
 | Aplicación | pytest-asyncio, dobles de prueba | Casos de uso contra puertos simulados | ≥ 85 % en `application/` |
-| Integración ✅ | pytest contra los servicios de `docker compose` (PostgreSQL, Redis, MinIO) | Migraciones aplicadas, **RLS verificado sobre la base real**, privilegios del rol de aplicación, consumo atómico del `state` OAuth, ciclo completo del almacén de adjuntos | 36 tests |
+| Integración ✅ | pytest contra los servicios de `docker compose` (PostgreSQL, Redis, LocalStack) | Migraciones aplicadas, **RLS verificado sobre la base real**, privilegios del rol de aplicación, consumo atómico del `state` OAuth, ciclo completo del almacén de adjuntos | 36 tests |
 | Contrato | Schemathesis sobre el OpenAPI | Fuzzing de todos los endpoints contra su esquema | sin 500 inesperados |
 | Seguridad | Suite dedicada | Acceso cruzado entre tenants, escalada de rol, JWT manipulado (`alg: none`, firma inválida, `aud` erróneo), path traversal en el nombre del adjunto, PDF bomb, archivo con magic bytes falsos | todos deben recibir un rechazo |
 | E2E | Playwright | Login → vincular buzón (mock) → escanear → revisar → exportar | flujos críticos |
@@ -771,7 +771,7 @@ expuesto a Internet todas las bibliotecas nativas de parseo.
 | **4 — Extracción** ✅ | Cadena de estrategias, preprocesamiento OpenCV, perfil SUNAT, objetos de valor con validación, confianza por campo | Precisión medida sobre un set sintético etiquetado |
 | **5 — Revisión y reportes** ✅ | Cola de revisión humana, corrección y aprobación, export Excel/CSV asíncrono, estadísticas | Flujo completo extremo a extremo |
 | **6 — Frontend** | Design system, features, cliente generado, BFF, SSE, a11y, tests | Playwright en verde sobre los flujos críticos |
-| **7 — Endurecimiento** 🔄 | Tests de integración contra PostgreSQL, Redis y MinIO reales ✅ · rate limiting, cuotas, circuit breakers, aislamiento del worker y escaneo de imágenes ✅ (fases 0–3) · pendientes: pruebas de carga con k6 y E2E con Playwright | Informe de seguridad y de carga |
+| **7 — Endurecimiento** 🔄 | Tests de integración contra PostgreSQL, Redis y un S3 real ✅ · rate limiting, cuotas, circuit breakers, aislamiento del worker y escaneo de imágenes ✅ (fases 0–3) · pendientes: pruebas de carga con k6 y E2E con Playwright | Informe de seguridad y de carga |
 | **8 — Operación** | Runbooks, dashboards, alertas, manual técnico y de usuario, despliegue a producción | Sistema operando y documentado |
 
 ---
@@ -792,7 +792,7 @@ expuesto a Internet todas las bibliotecas nativas de parseo.
 ## Apéndice — Stack completo
 
 **Backend:** Python 3.12 · FastAPI · Pydantic v2 · SQLAlchemy 2.0 async · Alembic ·
-asyncpg · ARQ · Redis · PostgreSQL 16 · boto3 / MinIO · PyMuPDF · pdfplumber · Tesseract ·
+asyncpg · ARQ · Redis · PostgreSQL 16 · aioboto3 (S3) · PyMuPDF · pdfplumber · Tesseract ·
 OpenCV · Pillow · openpyxl · structlog · OpenTelemetry · cryptography · Authlib ·
 pytest · Testcontainers · ruff · mypy · import-linter · bandit
 
