@@ -1,13 +1,14 @@
 """
-Middlewares transversales: correlacion, cabeceras de seguridad y rate limiting.
+Middlewares transversales: correlacion, metricas, cabeceras de seguridad y
+rate limiting.
 
 Proposito
     Aplicar en el borde los controles que deben valer para toda la API,
     sin repetirlos en cada router.
 
 Flujo
-    peticion -> request_id -> rate limit -> ruta -> cabeceras de seguridad
-    -> respuesta
+    peticion -> request_id -> metricas -> rate limit -> ruta -> cabeceras de
+    seguridad -> respuesta
 
 Dependencias
     Starlette, Redis (contador distribuido), structlog.
@@ -31,6 +32,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from mailauto.shared.observability import metricas
 from mailauto.shared.observability.logging import obtener_logger
 
 logger = obtener_logger(__name__)
@@ -69,6 +71,70 @@ class MiddlewareDeCorrelacion(BaseHTTPMiddleware):
         respuesta.headers[_CABECERA_REQUEST_ID] = request_id
         logger.info("peticion_atendida", status=respuesta.status_code, duracion_ms=duracion_ms)
         return respuesta
+
+
+class MiddlewareDeMetricas(BaseHTTPMiddleware):
+    """
+    Cuenta peticiones y mide su duracion para Prometheus.
+
+    La ruta se etiqueta con su PATRON y no con la URL recibida. Es la
+    diferencia entre una serie temporal por endpoint y una por recurso:
+    `/api/v1/scans/{trabajo_id}` frente a una serie nueva por cada escaneo
+    que alguien consulte. Lo segundo tumba Prometheus en una semana.
+
+    Una peticion a una ruta inexistente se etiqueta como `desconocida`, y
+    no con su URL: si no, cualquiera genera series a voluntad pidiendo
+    rutas al azar, que es una via de agotamiento de memoria del sistema de
+    metricas.
+    """
+
+    _RUTAS_EXENTAS: Final = frozenset({"/metrics"})
+
+    async def dispatch(self, request: Request, call_next: Siguiente) -> Response:
+        if request.url.path in self._RUTAS_EXENTAS:
+            return await call_next(request)
+
+        inicio = time.perf_counter()
+        respuesta = await call_next(request)
+        transcurrido = time.perf_counter() - inicio
+
+        ruta = _patron_de_ruta(request)
+        metricas.duracion_http.labels(metodo=request.method, ruta=ruta).observe(transcurrido)
+        metricas.peticiones_http.labels(
+            metodo=request.method, ruta=ruta, estado=str(respuesta.status_code)
+        ).inc()
+        return respuesta
+
+
+def _patron_de_ruta(request: Request) -> str:
+    """
+    Devuelve la ruta con sus parametros sustituidos por sus nombres.
+
+    El patron se reconstruye desde la ruta recibida y los parametros que el
+    enrutador extrajo, en lugar de leerlo del objeto de ruta: FastAPI anida
+    los routers incluidos, asi que el `path` de la ruta coincidente es
+    relativo a su router (`/records`) y no la ruta completa
+    (`/api/v1/records`). Reconstruirlo aqui no depende de como el framework
+    organice su arbol por dentro.
+
+    La sustitucion es por SEGMENTO completo y no por subcadena: reemplazar
+    la primera aparicion del valor en la ruta podria acertar en el tramo
+    equivocado cuando el valor coincide con un literal.
+
+    Sin ruta coincidente —un 404— se devuelve un valor fijo y no la URL
+    pedida: si no, cualquiera genera series temporales a voluntad pidiendo
+    rutas al azar, que es una via de agotamiento de la memoria del sistema
+    de metricas.
+    """
+    if request.scope.get("route") is None:
+        return "desconocida"
+
+    parametros = request.scope.get("path_params") or {}
+    por_valor = {str(valor): f"{{{nombre}}}" for nombre, valor in parametros.items()}
+    if not por_valor:
+        return request.url.path
+
+    return "/".join(por_valor.get(tramo, tramo) for tramo in request.url.path.split("/"))
 
 
 class MiddlewareDeCabecerasDeSeguridad(BaseHTTPMiddleware):
@@ -183,6 +249,7 @@ class MiddlewareDeRateLimit(BaseHTTPMiddleware):
 
         if int(actual) > self._limite:
             logger.warning("rate_limit_excedido", identidad=identidad, limite=self._limite)
+            metricas.rechazos_por_limite.labels(control="cortafuegos").inc()
             return JSONResponse(
                 status_code=429,
                 content={

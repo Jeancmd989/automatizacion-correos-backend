@@ -135,6 +135,17 @@ class FabricaDeSesiones:
         async with self._crear() as sesion, sesion.begin():
             yield sesion
 
+    @property
+    def engine(self) -> AsyncEngine:
+        """
+        Motor subyacente.
+
+        Lo necesita la instrumentacion de trazas, que envuelve el engine y
+        no las sesiones. Se expone como propiedad de solo lectura para que
+        nadie lo sustituya y se salte el aislamiento por tenant.
+        """
+        return self._engine
+
     async def cerrar(self) -> None:
         await self._engine.dispose()
 

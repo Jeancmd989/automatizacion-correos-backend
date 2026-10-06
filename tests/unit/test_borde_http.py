@@ -32,6 +32,7 @@ def _ajustes_de_produccion(**extra: Any) -> Settings:  # noqa: ANN401 - campos d
         "docs_enabled": False,
         "cors_origins": ["https://app.ejemplo.com"],
         "oauth_redirect_uris": ["https://app.ejemplo.com/oauth/callback"],
+        "metrics_token": "token-de-metricas",
     }
     return ajustes_de_pruebas(**{**propios, **extra})
 

@@ -32,6 +32,7 @@ def _base_de_produccion(**extra: object) -> dict[str, object]:
         "docs_enabled": False,
         "storage_access_key": "k",
         "storage_secret_key": "s",
+        "metrics_token": "token-de-metricas",
         **extra,
     }
 
@@ -55,6 +56,9 @@ def test_una_configuracion_de_produccion_correcta_es_valida() -> None:
         ("kms_provider", "local", "KMS_PROVIDER"),
         ("oauth_redirect_uris", [], "OAUTH_REDIRECT_URIS"),
         ("store_raw_ocr_text", True, "STORE_RAW_OCR_TEXT"),
+        # /metrics revela rutas internas, tasas de error y volumen de uso:
+        # abierto es reconocimiento gratuito para quien prepara un ataque.
+        ("metrics_token", None, "METRICS_TOKEN"),
     ],
 )
 def test_produccion_rechaza_configuracion_insegura(

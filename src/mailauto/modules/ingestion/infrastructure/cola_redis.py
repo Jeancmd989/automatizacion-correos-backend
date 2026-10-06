@@ -28,10 +28,12 @@ Decisiones de diseño
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import AsyncIterator
 from uuid import UUID
 
 from arq import ArqRedis
+from arq.constants import default_queue_name
 from redis.asyncio import Redis
 
 from mailauto.modules.ingestion.domain.ports import CanalDeProgreso, ColaDeTrabajos
@@ -110,6 +112,31 @@ class ColaDeTrabajosRedis(ColaDeTrabajos):
 
     async def cancelacion_solicitada(self, trabajo_id: UUID) -> bool:
         return bool(await self._redis.exists(f"{_PREFIJO_CANCELACION}{trabajo_id}"))
+
+    async def estado(self) -> tuple[int, float]:
+        """
+        Profundidad de la cola y antiguedad del trabajo mas viejo.
+
+        ARQ guarda los trabajos pendientes en un conjunto ordenado por su
+        instante de ejecucion, asi que ambas cifras salen de dos consultas
+        baratas y no hay que recorrer nada.
+
+        La antiguedad es la cifra que de verdad importa para una alerta: la
+        profundidad sola no distingue una cola de mil trabajos que se vacia
+        en un minuto de una de cincuenta que lleva una hora atascada.
+        """
+        pendientes = await self._arq.zcard(default_queue_name)
+        if not pendientes:
+            return 0, 0.0
+
+        primeros = await self._arq.zrange(default_queue_name, 0, 0, withscores=True)
+        if not primeros:
+            return int(pendientes), 0.0
+
+        # Las puntuaciones de ARQ son milisegundos desde la epoca.
+        _, marca = primeros[0]
+        antiguedad = max(0.0, time.time() - float(marca) / 1000)
+        return int(pendientes), antiguedad
 
     async def esta_disponible(self) -> bool:
         try:

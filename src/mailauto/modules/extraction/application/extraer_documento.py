@@ -54,6 +54,7 @@ from mailauto.modules.extraction.domain.ports import (
     PerfilDeExtraccion,
     RepositorioDeRegistros,
 )
+from mailauto.shared.observability import metricas
 from mailauto.shared.observability.logging import obtener_logger
 
 logger = obtener_logger(__name__)
@@ -141,8 +142,22 @@ class ExtraerDocumento:
             resultado = await estrategia.leer(documento, self._perfil)
             resultados.append(resultado)
 
+            # La metrica va aqui y no dentro de cada estrategia: es el unico
+            # punto por el que pasan todas, asi que una estrategia nueva
+            # queda medida sin que nadie se acuerde de instrumentarla.
+            nombre = estrategia.nombre.value
+            metricas.extracciones.labels(
+                estrategia=nombre, resultado="exito" if resultado.tuvo_exito else "fallo"
+            ).inc()
+            metricas.duracion_de_etapa.labels(etapa=f"extraccion:{nombre}").observe(
+                resultado.duracion_ms / 1000
+            )
+
             if estrategia.nombre is Estrategia.VISION_IA:
                 self._presupuesto.registrar_llamada(documento.trabajo_id)
+                metricas.llamadas_a_ia.labels(
+                    resultado="exito" if resultado.tuvo_exito else "fallo"
+                ).inc()
 
             if resultado.tuvo_exito and policies.es_suficiente_para_detenerse(resultado):
                 # Los campos imprescindibles estan y son fiables: seguir

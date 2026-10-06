@@ -38,6 +38,7 @@ from fastapi import Depends, Header, Query, Request, params
 from mailauto.bootstrap.container import Contenedor
 from mailauto.bootstrap.settings import Settings
 from mailauto.shared.errors import ErrorDeAutenticacion, ErrorDeValidacion, LimiteExcedido
+from mailauto.shared.observability import metricas
 from mailauto.shared.pagination import LIMITE_MAXIMO, LIMITE_POR_DEFECTO, SolicitudDePagina
 from mailauto.shared.security.context import Permiso, TenantContext
 
@@ -124,6 +125,7 @@ def limita_por_tenant(
             ventana_segundos=ventana_segundos,
         )
         if not permitido:
+            metricas.rechazos_por_limite.labels(control="cuota").inc()
             raise LimiteExcedido(
                 reintentar_en_segundos=ventana_segundos,
                 contexto={"recurso": recurso, "maximo": maximo},

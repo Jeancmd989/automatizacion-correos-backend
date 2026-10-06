@@ -156,6 +156,10 @@ class Settings(BaseSettings):
     retention_days_attachments: Annotated[int, Field(ge=1, le=3650)] = 365
 
     # ── Observabilidad ───────────────────────────────────────────────
+    # Si se define, `/metrics` exige `Authorization: Bearer <valor>`. En
+    # produccion es obligatorio: el endpoint revela rutas internas, tasas
+    # de error y volumen de uso, y sirve de reconocimiento gratuito.
+    metrics_token: str | None = None
     otel_exporter_endpoint: str | None = None
     sentry_dsn: str | None = None
     docs_enabled: bool = True
@@ -237,6 +241,11 @@ class Settings(BaseSettings):
             )
         if self.storage_endpoint_url and "localhost" in self.storage_endpoint_url:
             problemas.append("STORAGE_ENDPOINT_URL apunta a localhost")
+        if not self.metrics_token:
+            problemas.append(
+                "METRICS_TOKEN es obligatorio: /metrics revela rutas internas, "
+                "tasas de error y volumen de uso"
+            )
 
         if problemas:
             detalle = "\n  - ".join(problemas)

@@ -550,12 +550,12 @@ Los adjuntos son **entrada no confiable de terceros procesada por parsers nativo
 
 ## 11. Observabilidad
 
-- **Trazas** — OpenTelemetry extremo a extremo: petición HTTP → job en cola → worker → llamada al proveedor. Una traza completa por escaneo.
-- **Métricas** — Prometheus: duración por etapa del pipeline, tasa de éxito por estrategia de extracción, profundidad y antigüedad de la cola, costo de IA por tenant, tasa de 429 por proveedor.
-- **Logs** — `structlog` en JSON con `trace_id`, `tenant_id` y `job_id`, y un procesador de redacción que elimina tokens, cabeceras de autorización y campos marcados como PII antes de serializar.
-- **Errores** — Sentry con *scrubbing* de datos sensibles activado.
-- **Salud** — `/health/live` (el proceso responde) y `/health/ready` (BD, Redis y storage alcanzables). Cada probe usa el endpoint correcto.
-- **Auditoría** — tabla append-only para vinculación y desvinculación de buzones, lanzamiento de escaneos, exportación de reportes, aprobación de registros y cualquier acción de administrador.
+- **Trazas** ✅ — OpenTelemetry sobre OTLP/HTTP, con instrumentación de FastAPI y SQLAlchemy. Las sondas de salud quedan excluidas: se consultan cada pocos segundos y producirían la mayoría de las trazas sin aportar nada. Sin `OTEL_EXPORTER_ENDPOINT` no se instala el proveedor, para que el exportador no llene la consola reintentando contra un colector ausente.
+- **Métricas** ✅ — Prometheus en `/metrics`, protegido con `METRICS_TOKEN` (obligatorio en producción): latencia y tasa de error del borde HTTP, duración por etapa del pipeline, resultado por estrategia de extracción, profundidad y **antigüedad** de la cola, rechazos por límite y por cuota, y clase de respuesta por proveedor. **Sin etiqueta de tenant**, a diferencia de lo que planteaba este documento: una etiqueta por cliente hace crecer la cardinalidad sin techo —una serie nueva por cliente y combinación de etiquetas— y expone cuántos clientes hay y cuánto usa cada uno en un endpoint que suele estar menos protegido que la API. El consumo por tenant se consulta en la base de datos, donde ya está y tiene control de acceso.
+- **Logs** ✅ — `structlog` en JSON con `trace_id`, `tenant_id` y `job_id`, y un procesador de redacción que elimina tokens, cabeceras de autorización y campos marcados como PII antes de serializar.
+- **Errores** ⏳ — `SENTRY_DSN` queda reservado pero **no implementado**: añadir el SDK es una dependencia nueva y una cuenta externa, y mientras tanto los 5xx se siguen por logs y trazas, que ya llevan `trace_id`.
+- **Salud** ✅ — `/health/live` (el proceso responde) y `/health/ready` (BD, Redis y storage alcanzables). Cada probe usa el endpoint correcto: una liveness que dependiera de la base de datos convertiría una degradación en una caída total.
+- **Auditoría** ✅ — tabla append-only para vinculación y desvinculación de buzones, lanzamiento de escaneos, exportación de reportes, aprobación de registros y cualquier acción de administrador.
 
 ---
 
@@ -773,7 +773,7 @@ expuesto a Internet todas las bibliotecas nativas de parseo.
 | **5 — Revisión y reportes** ✅ | Cola de revisión humana, corrección y aprobación, export Excel/CSV asíncrono, estadísticas | Flujo completo extremo a extremo |
 | **6 — Frontend** | Design system, features, cliente generado, BFF, SSE, a11y, tests | Playwright en verde sobre los flujos críticos |
 | **7 — Endurecimiento** 🔄 | Tests de integración contra PostgreSQL, Redis y un S3 real ✅ · E2E con Playwright ✅ · cuotas por tenant separadas del cortafuegos de avalanchas ✅ · escenario de humo de carga ✅ · pendiente: ejecutar los escenarios de carga autenticados en staging | Informe de seguridad y de carga |
-| **8 — Operación** | Runbooks, dashboards, alertas, manual técnico y de usuario, despliegue a producción | Sistema operando y documentado |
+| **8 — Operación** ✅ | Métricas de Prometheus, trazas OTEL, 13 reglas de alerta validadas con `promtool`, runbook con una entrada por alerta y guía de despliegue con sus bloqueantes | [`operacion/`](operacion/) |
 
 ---
 

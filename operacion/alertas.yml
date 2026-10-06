@@ -1,0 +1,219 @@
+# ─────────────────────────────────────────────────────────────────────
+# Reglas de alerta de Prometheus.
+#
+# Cada alerta apunta a una entrada del runbook con el mismo nombre. Una
+# alerta sin procedimiento escrito acaba silenciada, y una silenciada es
+# peor que no tenerla: da la impresion de que algo vigila.
+#
+# Se valida con:
+#   docker run --rm -v "$PWD/operacion:/op:ro" prom/prometheus:latest \
+#     promtool check rules /op/alertas.yml
+#
+# Criterio de severidad:
+#   critica  — hay usuarios sin servicio o datos en riesgo. Despierta.
+#   aviso    — degradacion o tendencia que acabara siendo critica. Horario laboral.
+#
+# Ninguna alerta se dispara por un valor instantaneo: todas exigen que la
+# condicion se mantenga (`for`), porque un pico de diez segundos no
+# requiere que nadie se levante.
+# ─────────────────────────────────────────────────────────────────────
+
+groups:
+  - name: mailauto-disponibilidad
+    rules:
+      - alert: ApiCaida
+        expr: up{job="mailauto-api"} == 0
+        for: 2m
+        labels:
+          severidad: critica
+          runbook: ApiCaida
+        annotations:
+          resumen: "La instancia {{ $labels.instance }} no responde al raspado"
+          descripcion: >-
+            Prometheus no obtiene metricas de esta instancia. Si caen todas,
+            el servicio esta fuera.
+
+      - alert: SondaDePreparacionDegradada
+        # /health/ready devuelve 503 cuando la base de datos, Redis o el
+        # almacen no son alcanzables. El balanceador ya retira la replica;
+        # la alerta existe para que alguien averigue por que.
+        expr: |
+          sum(rate(mailauto_peticiones_http_total{ruta="/health/ready",estado="503"}[5m])) > 0
+        for: 5m
+        labels:
+          severidad: critica
+          runbook: SondaDePreparacionDegradada
+        annotations:
+          resumen: "Alguna dependencia no es alcanzable"
+          descripcion: >-
+            Consultar /health/ready para ver que componente falla:
+            base_de_datos, cola o almacenamiento.
+
+      - alert: TasaDeErroresDelServidor
+        expr: |
+          sum(rate(mailauto_peticiones_http_total{estado=~"5.."}[5m]))
+            / sum(rate(mailauto_peticiones_http_total[5m])) > 0.01
+        for: 10m
+        labels:
+          severidad: critica
+          runbook: TasaDeErroresDelServidor
+        annotations:
+          resumen: "Mas del 1 % de las peticiones termina en 5xx"
+          descripcion: >-
+            Un 5xx es siempre un defecto: los errores esperados del cliente
+            son 4xx. Buscar por `trace_id` en los logs.
+
+  - name: mailauto-latencia
+    rules:
+      - alert: LecturasLentas
+        # p95 sobre el histograma, excluyendo sondas y metricas: su
+        # latencia no representa a ningun usuario.
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, ruta) (
+              rate(mailauto_peticion_http_segundos_bucket{ruta=~"/api/v1/(records|review).*"}[10m])
+            )
+          ) > 0.3
+        for: 15m
+        labels:
+          severidad: aviso
+          runbook: LecturasLentas
+        annotations:
+          resumen: "p95 de {{ $labels.ruta }} por encima de 300 ms"
+          descripcion: >-
+            Es el objetivo de rendimiento del plan de arquitectura. La causa
+            habitual es un indice que ya no cubre la consulta al crecer la
+            tabla.
+
+  - name: mailauto-cola
+    rules:
+      - alert: ColaEstancada
+        # La antiguedad es la cifra que importa, no la profundidad: mil
+        # trabajos que se vacian en un minuto no son un problema; cincuenta
+        # que llevan media hora, si.
+        expr: max(mailauto_cola_antiguedad_segundos) > 1800
+        for: 5m
+        labels:
+          severidad: critica
+          runbook: ColaEstancada
+        annotations:
+          resumen: "El trabajo mas antiguo lleva mas de 30 minutos sin empezar"
+          descripcion: >-
+            Normalmente significa que no hay workers vivos o que estan todos
+            bloqueados en un documento.
+
+      - alert: ColaCreciendo
+        expr: |
+          max(mailauto_cola_profundidad) > 100
+          and deriv(max(mailauto_cola_profundidad)[30m:1m]) > 0
+        for: 30m
+        labels:
+          severidad: aviso
+          runbook: ColaCreciendo
+        annotations:
+          resumen: "La cola crece de forma sostenida"
+          descripcion: >-
+            Llega mas trabajo del que los workers procesan. Si la tendencia
+            se mantiene, acabara en ColaEstancada.
+
+  - name: mailauto-pipeline
+    rules:
+      - alert: ExtraccionFallandoEnUnaEstrategia
+        expr: |
+          sum by (estrategia) (rate(mailauto_extracciones_total{resultado="fallo"}[30m]))
+            / sum by (estrategia) (rate(mailauto_extracciones_total[30m])) > 0.5
+        for: 30m
+        labels:
+          severidad: aviso
+          runbook: ExtraccionFallandoEnUnaEstrategia
+        annotations:
+          resumen: "La estrategia {{ $labels.estrategia }} falla en mas de la mitad de los intentos"
+          descripcion: >-
+            Las demas estrategias cubren el hueco, asi que el usuario ve
+            registros incompletos en lugar de errores. De ahi que sea aviso
+            y no critica: no hay caida, hay degradacion silenciosa.
+
+      - alert: VisionIaFallando
+        expr: |
+          sum(rate(mailauto_llamadas_a_ia_total{resultado="fallo"}[15m]))
+            / sum(rate(mailauto_llamadas_a_ia_total[15m])) > 0.2
+        for: 15m
+        labels:
+          severidad: aviso
+          runbook: VisionIaFallando
+        annotations:
+          resumen: "Mas de un 20 % de las llamadas al modelo falla"
+          descripcion: >-
+            Revisar credencial, cuota del proveedor y limites de tamaño.
+            El pipeline sigue funcionando con las estrategias anteriores.
+
+      - alert: EtapaDelPipelineLenta
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, etapa) (rate(mailauto_etapa_segundos_bucket[30m]))
+          ) > 120
+        for: 30m
+        labels:
+          severidad: aviso
+          runbook: EtapaDelPipelineLenta
+        annotations:
+          resumen: "La etapa {{ $labels.etapa }} tarda mas de dos minutos en p95"
+          descripcion: >-
+            Suele ser OCR sobre documentos escaneados a resolucion muy alta.
+
+  - name: mailauto-limites
+    rules:
+      - alert: MuchosRechazosPorCuota
+        expr: sum(rate(mailauto_rechazos_por_limite_total{control="cuota"}[15m])) > 0.5
+        for: 15m
+        labels:
+          severidad: aviso
+          runbook: MuchosRechazosPorCuota
+        annotations:
+          resumen: "Clientes alcanzando su cuota de forma sostenida"
+          descripcion: >-
+            No es un fallo tecnico: es un cliente que necesita mas plan, o
+            una integracion que reintenta sin respetar el 429.
+
+      - alert: CortafuegosRechazandoMucho
+        expr: sum(rate(mailauto_rechazos_por_limite_total{control="cortafuegos"}[5m])) > 5
+        for: 10m
+        labels:
+          severidad: aviso
+          runbook: CortafuegosRechazandoMucho
+        annotations:
+          resumen: "El limite por minuto esta cortando trafico de forma continua"
+          descripcion: >-
+            Un cliente mal programado, un bucle de reintentos sin espera o un
+            abuso. Identificar el origen en los logs de `rate_limit_excedido`.
+
+  - name: mailauto-proveedores
+    rules:
+      - alert: ProveedorDeCorreoRechazando
+        expr: |
+          sum by (proveedor) (rate(mailauto_respuestas_de_proveedor_total{clase="4xx"}[15m]))
+            / sum by (proveedor) (rate(mailauto_respuestas_de_proveedor_total[15m])) > 0.3
+        for: 15m
+        labels:
+          severidad: aviso
+          runbook: ProveedorDeCorreoRechazando
+        annotations:
+          resumen: "{{ $labels.proveedor }} rechaza mas del 30 % de las peticiones"
+          descripcion: >-
+            Casi siempre es cuota del proveedor o consentimientos revocados.
+            Si son 401, los tokens dejaron de ser validos.
+
+      - alert: ProveedorDeCorreoCaido
+        expr: |
+          sum by (proveedor) (rate(mailauto_respuestas_de_proveedor_total{clase="5xx"}[10m])) > 0.1
+        for: 10m
+        labels:
+          severidad: aviso
+          runbook: ProveedorDeCorreoCaido
+        annotations:
+          resumen: "{{ $labels.proveedor }} devuelve errores de servidor"
+          descripcion: >-
+            Es una caida ajena. Comprobar su pagina de estado antes de
+            investigar nada propio.

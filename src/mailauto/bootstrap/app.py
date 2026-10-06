@@ -37,6 +37,7 @@ from mailauto.api.middleware.errores import registrar_manejadores
 from mailauto.api.middleware.seguridad import (
     MiddlewareDeCabecerasDeSeguridad,
     MiddlewareDeCorrelacion,
+    MiddlewareDeMetricas,
     MiddlewareDeRateLimit,
     Siguiente,
 )
@@ -44,8 +45,15 @@ from mailauto.api.v1.routers import buzones, escaneos, perfil, registros, salud
 from mailauto.bootstrap.container import construir_contenedor
 from mailauto.bootstrap.settings import Settings, get_settings
 from mailauto.shared.observability.logging import configurar_logging, obtener_logger
+from mailauto.shared.observability.trazas import (
+    configurar_trazas,
+    instrumentar_api,
+    instrumentar_base_de_datos,
+)
 
 logger = obtener_logger(__name__)
+
+_VERSION = "0.1.0"
 
 
 def _identificador_de_operacion(ruta: APIRoute) -> str:
@@ -75,14 +83,26 @@ def crear_app(settings: Settings | None = None) -> FastAPI:
         formato_json=ajustes.environment.es_productivo,
     )
 
+    trazas_activas = configurar_trazas(
+        endpoint=ajustes.otel_exporter_endpoint,
+        nombre_del_servicio="mailauto-api",
+        entorno=ajustes.environment.value,
+        version=_VERSION,
+    )
+
     @asynccontextmanager
     async def ciclo_de_vida(app: FastAPI) -> AsyncIterator[None]:
         logger.info("arrancando", entorno=ajustes.environment.value)
         contenedor = await construir_contenedor(ajustes)
         app.state.contenedor = contenedor
 
+        if trazas_activas:
+            # Se instrumenta aqui y no al crear la app: el engine no existe
+            # hasta que el contenedor esta construido.
+            instrumentar_base_de_datos(contenedor.sesiones.engine)
+
         if not ajustes.environment.es_productivo:
-            # En desarrollo, MinIO arranca sin buckets. En produccion el
+            # En desarrollo el almacen arranca sin buckets. En produccion el
             # bucket lo provisiona la infraestructura con sus politicas.
             await contenedor.almacen.asegurar_bucket()
 
@@ -94,7 +114,7 @@ def crear_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(
         title="Automatizacion de Correos API",
-        version="0.1.0",
+        version=_VERSION,
         description=(
             "Ingesta de adjuntos de correo y extraccion de datos tributarios. "
             "Todas las rutas requieren un token OIDC salvo las sondas de salud."
@@ -112,6 +132,9 @@ def crear_app(settings: Settings | None = None) -> FastAPI:
     _montar_middlewares(app, ajustes)
     registrar_manejadores(app)
     _montar_routers(app, ajustes)
+
+    if trazas_activas:
+        instrumentar_api(app)
 
     return app
 
@@ -151,6 +174,11 @@ def _montar_middlewares(app: FastAPI, ajustes: Settings) -> None:
         _RateLimitPerezoso,
         limite_por_minuto=ajustes.rate_limit_default_per_minute,
     )
+
+    # Lo mas externo junto a la correlacion: asi mide tambien la latencia
+    # de lo que el limitador rechaza, que es parte de la experiencia del
+    # cliente aunque no llegue a ninguna ruta.
+    app.add_middleware(MiddlewareDeMetricas)
 
     app.add_middleware(MiddlewareDeCorrelacion)
 

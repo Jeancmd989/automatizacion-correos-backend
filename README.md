@@ -25,7 +25,8 @@ Implementadas las **fases 0 a 5** y los tests de integración de la **fase 7** d
 | 7 | Tests de integración contra PostgreSQL, Redis y S3 reales | ✅ |
 | 7 | Cuotas por tenant separadas del limitador de avalanchas | ✅ |
 | 7 | Pruebas de carga (escenarios autenticados pendientes de staging) | 🔄 |
-| 8 | Operación: runbooks, dashboards, despliegue | pendiente |
+| 7 | Métricas, trazas y endpoint `/metrics` protegido | ✅ |
+| 8 | Operación: métricas, trazas, alertas, runbook y despliegue | ✅ |
 
 **Verificación actual:** 381 tests en verde (345 sin infraestructura + 36 de
 integración), 6/6 contratos de arquitectura, `mypy --strict` sin hallazgos, `ruff`,
@@ -173,6 +174,30 @@ verificar nada.
 `lint-imports` es el que conviene no saltarse: verifica que las capas no se han cruzado.
 Un import "temporal" de infraestructura dentro del dominio falla el pipeline, y es así
 como la arquitectura se mantiene con el tiempo en vez de degradarse.
+
+---
+
+## Operación
+
+| Documento | Para qué |
+|-----------|----------|
+| [`operacion/RUNBOOK.md`](operacion/RUNBOOK.md) | Procedimientos de guardia: una entrada por alerta, con qué significa, cómo confirmarlo, qué hacer y **qué no hacer** |
+| [`operacion/DESPLIEGUE.md`](operacion/DESPLIEGUE.md) | Bloqueantes de producción, secretos, orden de despliegue, escalado y lista de comprobación |
+| [`operacion/alertas.yml`](operacion/alertas.yml) | 13 reglas de Prometheus, validadas con `promtool`. Cada una apunta a su entrada del runbook |
+
+**Métricas.** `/metrics` en formato Prometheus, protegido con `METRICS_TOKEN`
+—obligatorio en producción, porque el endpoint revela rutas internas, tasas de error y
+volumen de uso—. Ninguna serie lleva `tenant_id`: una etiqueta por cliente hace crecer la
+cardinalidad sin techo y expone cuántos clientes hay y cuánto usa cada uno.
+
+**Trazas.** OpenTelemetry sobre OTLP/HTTP. Sin `OTEL_EXPORTER_ENDPOINT` no se instala
+nada, para no llenar la consola de errores de exportación en desarrollo. Las sondas de
+salud quedan excluidas: se llaman cada pocos segundos y producirían la mayoría de las
+trazas con valor cero.
+
+```bash
+docker run --rm -v "$PWD/operacion:/op:ro" --entrypoint promtool prom/prometheus:latest check rules /op/alertas.yml
+```
 
 ---
 
